@@ -8,13 +8,11 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/PaddleHQ/paddle-go-sdk"
 	clerk "github.com/clerk/clerk-sdk-go/v2"
 	gorilllaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/strct-org/portal/backend/internal/handlers"
 	"github.com/strct-org/portal/backend/internal/services"
 	"github.com/strct-org/portal/backend/middleware"
@@ -68,8 +66,9 @@ func main() {
 	}()
 
 	userService = services.NewUserService(dbPool)
-	userHandler := handlers.NewUserHandler(userService)
 
+	userHandler := handlers.NewUserHandler(userService)
+	webhookHandler := handlers.NewWebhookHandler(userService)
 
 	go func() {
 		for i := 0; i < 3; i++ {
@@ -110,24 +109,24 @@ func main() {
 	standardRouter.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", fs))
 	log.Printf("Serving static files from %s at /assets/", assetsDir)
 
-	standardRouter.HandleFunc("/webhooks/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
+	standardRouter.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
 
 	api := standardRouter.PathPrefix("/api/v1").Subrouter()
 
-	api.HandleFunc("/privacy-policy", docHandler.ServePrivacyPolicy).Methods("GET")
-	api.HandleFunc("/terms-of-services", docHandler.ServeTermsOfServices).Methods("GET")
-	api.HandleFunc("/refund-policy", docHandler.ServeRefundPolicy).Methods("GET")
-	api.HandleFunc("/pricing", docHandler.ServePricing).Methods("GET")
+	// api.HandleFunc("/privacy-policy", docHandler.ServePrivacyPolicy).Methods("GET")
+	// api.HandleFunc("/terms-of-services", docHandler.ServeTermsOfServices).Methods("GET")
+	// api.HandleFunc("/refund-policy", docHandler.ServeRefundPolicy).Methods("GET")
+	// api.HandleFunc("/pricing", docHandler.ServePricing).Methods("GET")
 
-	api.HandleFunc("/delete-account-webpage", userHandler.DeleteAccountPage).Methods("GET")
-	api.HandleFunc("/delete-account-details-webpage", userHandler.UpdateAccountPage).Methods("GET")
+	// api.HandleFunc("/delete-account-webpage", userHandler.DeleteAccountPage).Methods("GET")
+	// api.HandleFunc("/delete-account-details-webpage", userHandler.UpdateAccountPage).Methods("GET")
 
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.ClerkAuthMiddleware)
 
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
-	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
-	protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")
+	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
+	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")
 	
 
 
