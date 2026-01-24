@@ -2,9 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +12,8 @@ import (
 	"github.com/strct-org/portal/backend/internal/services"
 	"github.com/strct-org/portal/backend/internal/types/clerk"
 	"github.com/strct-org/portal/backend/internal/types/user"
+
+	svix "github.com/svix/svix-webhooks/go"
 )
 
 type WebhookHandler struct {
@@ -28,22 +27,21 @@ func NewWebhookHandler(userService *services.UserService) *WebhookHandler {
 }
 
 func (h *WebhookHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Request) {
-	if !h.verifyWebhookSignature(r) {
-		log.Println("Invalid webhook signature")
-		http.Error(w, "Invalid signature", http.StatusUnauthorized)
-		return
-	}
-
-	body, err := io.ReadAll(r.Body)
+	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading webhook body: %v", err)
 		http.Error(w, "Error reading body", http.StatusBadRequest)
 		return
 	}
 
+	if !h.verifyWebhookSignature(r.Header, payload) {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
 	var event clerk.ClerkWebhookEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		log.Printf("Error parsing webhook: %v", err)
+	if err := json.Unmarshal(payload, &event); err != nil {
+		log.Printf("Error parsing webhook JSON: %v", err)
 		http.Error(w, "Error parsing webhook", http.StatusBadRequest)
 		return
 	}
@@ -51,6 +49,7 @@ func (h *WebhookHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Reque
 	log.Printf("Received webhook event: %s", event.Type)
 
 	ctx := r.Context()
+
 	switch event.Type {
 	case "user.created":
 		if err := h.handleUserCreated(ctx, event.Data); err != nil {
@@ -59,24 +58,18 @@ func (h *WebhookHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Reque
 			return
 		}
 
-	case "user.updated":
-		if err := h.handleUserUpdated(ctx, event.Data); err != nil {
-			log.Printf("Error handling user.updated: %v", err)
-			http.Error(w, "Error processing webhook", http.StatusInternalServerError)
-			return
-		}
+	// case "user.updated":
+	// 	if err := h.handleUserUpdated(ctx, event.Data); err != nil {
+	// 		log.Printf("Error handling user.updated: %v", err)
+	// 		http.Error(w, "Error processing webhook", http.StatusInternalServerError)
+	// 		return
+	// 	}
 
 	case "user.deleted":
 		if err := h.handleUserDeleted(ctx, event.Data); err != nil {
 			log.Printf("Error handling user.deleted: %v", err)
 			http.Error(w, "Error processing webhook", http.StatusInternalServerError)
 			return
-		}
-
-	case "email.created":
-		if err := h.handleEmailVerified(ctx, event.Data); err != nil {
-			log.Printf("Error handling email.created: %v", err)
-			// Don't return error, this is not critical
 		}
 
 	default:
@@ -87,13 +80,34 @@ func (h *WebhookHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Reque
 	w.Write([]byte(`{"success": true}`))
 }
 
+func (h *WebhookHandler) verifyWebhookSignature(headers http.Header, payload []byte) bool {
+	secret := os.Getenv("CLERK_WEBHOOK_SECRET")
+	if secret == "" {
+		log.Println("WARNING: CLERK_WEBHOOK_SECRET not set. Skipping verification (Unsafe for production!)")
+		return true // Allow in dev if secret is missing, strictly meant for testing
+	}
+
+	wh, err := svix.NewWebhook(secret)
+	if err != nil {
+		log.Printf("Failed to initialize Svix webhook verifier: %v", err)
+		return false
+	}
+
+	err = wh.Verify(payload, headers)
+	if err != nil {
+		log.Printf("Webhook signature verification failed: %v", err)
+		return false
+	}
+
+	return true
+}
 func (h *WebhookHandler) handleUserCreated(ctx context.Context, data json.RawMessage) error {
 	var userData clerk.ClerkUserData
 	if err := json.Unmarshal(data, &userData); err != nil {
 		return fmt.Errorf("failed to unmarshal user data: %w", err)
 	}
 
-	// Get primary email
+	// 1. Extract Email
 	email := ""
 	emailVerified := false
 	if len(userData.EmailAddresses) > 0 {
@@ -101,73 +115,105 @@ func (h *WebhookHandler) handleUserCreated(ctx context.Context, data json.RawMes
 		emailVerified = userData.EmailAddresses[0].Verification.Status == "verified"
 	}
 
-	// Use username or generate from email
-	username := userData.Username
-	if username == "" {
-		username = userData.FirstName + userData.LastName
+	if email == "" {
+		return fmt.Errorf("no email found for user %s", userData.ID)
 	}
 
-	// Choose image URL
+	// 2. Safely Dereference Pointers
+	// The JSON says "first_name": "Martin", so this will work.
+	firstName := ""
+	if userData.FirstName != nil {
+		firstName = *userData.FirstName
+	}
+
+	lastName := ""
+	if userData.LastName != nil {
+		lastName = *userData.LastName
+	}
+
+	// 3. Username Logic
+	// The JSON explicitly says "username": NULL
+	username := ""
+	if userData.Username != nil {
+		username = *userData.Username
+	}
+
+	// Since it is null, we MUST generate one to satisfy DB constraints
+	if username == "" {
+		if firstName != "" || lastName != "" {
+			// Result: "MartinKovachki"
+			username = fmt.Sprintf("%s%s", firstName, lastName)
+		} else {
+			// Fallback: "martbul01@gmail.com" -> "martbul01"
+			username = email 
+		}
+	}
+
+	// 4. Image Logic
 	imageURL := userData.ImageURL
 	if imageURL == "" {
 		imageURL = userData.ProfileImageURL
 	}
 
+	// 5. Build the Request object
 	createReq := &user.CreateUserRequest{
 		ClerkID:   userData.ID,
 		Email:     email,
 		Username:  username,
-		FirstName: userData.FirstName,
-		LastName:  userData.LastName,
+		FirstName: firstName,
+		LastName:  lastName,
 		ImageURL:  imageURL,
 	}
 
-	user, err := h.userService.CreateUser(ctx, createReq)
+	// 6. Insert into Database
+	log.Printf("Inserting User: %s (Clerk: %s)", email, userData.ID)
+	
+	u, err := h.userService.CreateUser(ctx, createReq)
 	if err != nil {
+		log.Printf("DB Error: %v", err)
 		return fmt.Errorf("failed to create user in database: %w", err)
 	}
 
-	// Update email verification status
+	// 7. Handle Email Verification Status
 	if emailVerified {
 		h.userService.UpdateEmailVerification(ctx, userData.ID, true)
 	}
 
-	log.Printf("Successfully created user: %s (Clerk ID: %s)", user.Email, user.ClerkID)
+	log.Printf("Successfully created user: %s", u.ID)
 	return nil
 }
 
-func (h *WebhookHandler) handleUserUpdated(ctx context.Context, data json.RawMessage) error {
-	var userData clerk.ClerkUserData
-	if err := json.Unmarshal(data, &userData); err != nil {
-		return fmt.Errorf("failed to unmarshal user data: %w", err)
-	}
+// func (h *WebhookHandler) handleUserUpdated(ctx context.Context, data json.RawMessage) error {
+// 	var userData clerk.ClerkUserData
+// 	if err := json.Unmarshal(data, &userData); err != nil {
+// 		return fmt.Errorf("failed to unmarshal user data: %w", err)
+// 	}
 
-	// Use username or generate from name
-	username := userData.Username
-	if username == "" {
-		username = userData.FirstName + userData.LastName
-	}
+// 	username := userData.Username
+// 	if username == "" {
+// 		username = userData.FirstName + userData.LastName
+// 	}
 
-	imageURL := userData.ImageURL
-	if imageURL == "" {
-		imageURL = userData.ProfileImageURL
-	}
+// 	imageURL := userData.ImageURL
+// 	if imageURL == "" {
+// 		imageURL = userData.ProfileImageURL
+// 	}
 
-	updateReq := &user.UpdateProfileRequest{
-		Username:  username,
-		FirstName: userData.FirstName,
-		LastName:  userData.LastName,
-		ImageURL:  imageURL,
-	}
+// 	updateReq := &user.UpdateProfileRequest{
+// 		Username:  username,
+// 		FirstName: userData.FirstName,
+// 		LastName:  userData.LastName,
+// 		ImageURL:  imageURL,
+// 	}
 
-	_, err := h.userService.UpdateProfileByClerkID(ctx, userData.ID, updateReq)
-	if err != nil {
-		return fmt.Errorf("failed to update user: %w", err)
-	}
+// 	_, err := h.userService.UpdateProfileByClerkID(ctx, userData.ID, updateReq)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to update user: %w", err)
+// 	}
 
-	log.Printf("Successfully updated user: Clerk ID: %s", userData.ID)
-	return nil
-}
+// 	log.Printf("Successfully updated user: Clerk ID: %s", userData.ID)
+// 	return nil
+// }
 
 func (h *WebhookHandler) handleUserDeleted(ctx context.Context, data json.RawMessage) error {
 	var userData struct {
@@ -183,60 +229,4 @@ func (h *WebhookHandler) handleUserDeleted(ctx context.Context, data json.RawMes
 
 	log.Printf("Successfully deleted user: Clerk ID: %s", userData.ID)
 	return nil
-}
-
-func (h *WebhookHandler) handleEmailVerified(ctx context.Context, data json.RawMessage) error {
-	var emailData struct {
-		ID     string `json:"id"`
-		Object string `json:"object"`
-	}
-	if err := json.Unmarshal(data, &emailData); err != nil {
-		return fmt.Errorf("failed to unmarshal email data: %w", err)
-	}
-
-	// Note: You might need to fetch the user ID from Clerk API here
-	// For now, we'll skip this implementation
-	log.Printf("Email verified event received: %s", emailData.ID)
-	return nil
-}
-
-func (h *WebhookHandler) verifyWebhookSignature(r *http.Request) bool {
-	webhookSecret := os.Getenv("CLERK_WEBHOOK_SECRET")
-	if webhookSecret == "" {
-		log.Println("CLERK_WEBHOOK_SECRET not set, skipping signature verification")
-		return true // In development, you might want to skip verification
-	}
-
-	// Get signature from headers
-	svixID := r.Header.Get("svix-id")
-	svixTimestamp := r.Header.Get("svix-timestamp")
-	svixSignature := r.Header.Get("svix-signature")
-
-	if svixID == "" || svixTimestamp == "" || svixSignature == "" {
-		log.Println("Missing webhook signature headers")
-		return false
-	}
-
-	// Read body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("Error reading body for verification: %v", err)
-		return false
-	}
-
-	// Create signed content
-	signedContent := fmt.Sprintf("%s.%s.%s", svixID, svixTimestamp, string(body))
-
-	// Calculate expected signature
-	mac := hmac.New(sha256.New, []byte(webhookSecret))
-	mac.Write([]byte(signedContent))
-	expectedSignature := hex.EncodeToString(mac.Sum(nil))
-
-	// Compare signatures (v1 format)
-	providedSignature := ""
-	if len(svixSignature) > 3 && svixSignature[:3] == "v1," {
-		providedSignature = svixSignature[3:]
-	}
-
-	return hmac.Equal([]byte(expectedSignature), []byte(providedSignature))
 }

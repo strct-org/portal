@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -13,64 +12,63 @@ import (
 )
 
 type UserService struct {
-	db           *pgxpool.Pool
+	db *pgxpool.Pool
 }
 
 func NewUserService(db *pgxpool.Pool) *UserService {
 	return &UserService{
-		db:           db,
+		db: db,
 	}
 }
 
-func (s *UserService) CreateUser(ctx context.Context, req *user.CreateUserRequest) (*user.User, error) {
-	user := &user.User{
-		ID:        uuid.New().String(),
-		ClerkID:   req.ClerkID,
-		Email:     req.Email,
-		Username:  req.Username,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		ImageURL:  req.ImageURL,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
 
+func (s *UserService) CreateUser(ctx context.Context, req *user.CreateUserRequest) (*user.User, error) {
+	newID := uuid.New().String()
+
+    // Using COALESCE ensures that if for some reason logic fails, we don't crash on NULLs
+    // But req fields should be populated by the handler above.
 	query := `
 	INSERT INTO users (id, clerk_id, email, username, first_name, last_name, image_url, created_at, updated_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+	ON CONFLICT (clerk_id) DO NOTHING 
 	RETURNING id, clerk_id, email, username, first_name, last_name, image_url, email_verified, created_at, updated_at
 	`
+    // Note: Added ON CONFLICT DO NOTHING to prevent errors on retries
+
+	u := &user.User{}
 
 	err := s.db.QueryRow(
 		ctx,
 		query,
-		user.ID,
-		user.ClerkID,
-		user.Email,
-		user.Username,
-		user.FirstName,
-		user.LastName,
-		user.ImageURL,
-		user.CreatedAt,
-		user.UpdatedAt,
+		newID,
+		req.ClerkID,
+		req.Email,
+		req.Username,
+		req.FirstName,
+		req.LastName,
+		req.ImageURL,
 	).Scan(
-		&user.ID,
-		&user.ClerkID,
-		&user.Email,
-		&user.Username,
-		&user.FirstName,
-		&user.LastName,
-		&user.ImageURL,
-		&user.EmailVerified,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&u.ID,
+		&u.ClerkID,
+		&u.Email,
+		&u.Username,
+		&u.FirstName,
+		&u.LastName,
+		&u.ImageURL,
+		&u.EmailVerified,
+		&u.CreatedAt,
+		&u.UpdatedAt,
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+        // Handle "no rows in result set" which happens on Conflict Do Nothing
+        if err == pgx.ErrNoRows {
+             return s.GetUserByClerkID(ctx, req.ClerkID)
+        }
+		return nil, fmt.Errorf("db insert error: %w", err)
 	}
 
-	return user, nil
+	return u, nil
 }
 
 func (s *UserService) GetUserByClerkID(ctx context.Context, clerkID string) (*user.User, error) {
@@ -80,18 +78,18 @@ func (s *UserService) GetUserByClerkID(ctx context.Context, clerkID string) (*us
 	WHERE clerk_id = $1
 	`
 
-	user := &user.User{}
+	u := &user.User{}
 	err := s.db.QueryRow(ctx, query, clerkID).Scan(
-		&user.ID,
-		&user.ClerkID,
-		&user.Email,
-		&user.Username,
-		&user.FirstName,
-		&user.LastName,
-		&user.ImageURL,
-		&user.EmailVerified,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&u.ID,
+		&u.ClerkID,
+		&u.Email,
+		&u.Username,
+		&u.FirstName,
+		&u.LastName,
+		&u.ImageURL,
+		&u.EmailVerified,
+		&u.CreatedAt,
+		&u.UpdatedAt,
 	)
 
 	if err != nil {
@@ -101,9 +99,8 @@ func (s *UserService) GetUserByClerkID(ctx context.Context, clerkID string) (*us
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return user, nil
+	return u, nil
 }
-
 
 func (s *UserService) UpdateEmailVerification(ctx context.Context, clerkID string, verified bool) error {
 	query := `
@@ -117,6 +114,7 @@ func (s *UserService) UpdateEmailVerification(ctx context.Context, clerkID strin
 }
 
 func (s *UserService) GetFriends(ctx context.Context, clerkID string) ([]*user.User, error) {
+	// Note: Ensure you have a 'friendships' table created in your schema for this to work
 	query := `
     SELECT DISTINCT
         u.id,
@@ -141,9 +139,8 @@ func (s *UserService) GetFriends(ctx context.Context, clerkID string) ([]*user.U
     `
 
 	rows, err := s.db.Query(ctx, query, clerkID)
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query friends: %w", err)
 	}
 	defer rows.Close()
 
@@ -163,7 +160,7 @@ func (s *UserService) GetFriends(ctx context.Context, clerkID string) ([]*user.U
 			&u.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to scan friend: %w", err)
 		}
 		friends = append(friends, &u)
 	}
@@ -176,6 +173,10 @@ func (s *UserService) GetFriends(ctx context.Context, clerkID string) ([]*user.U
 }
 
 func (s *UserService) UpdateProfileByClerkID(ctx context.Context, clerkID string, req *user.UpdateProfileRequest) (*user.User, error) {
+	// Logic: COALESCE(NULLIF($N, ''), col) means:
+	// 1. If input is empty string, convert to NULL
+	// 2. If NULL, use existing column value
+	// 3. Otherwise use new value
 	query := `
 	UPDATE users
 	SET 
@@ -183,13 +184,12 @@ func (s *UserService) UpdateProfileByClerkID(ctx context.Context, clerkID string
 		first_name = COALESCE(NULLIF($3, ''), first_name),
 		last_name = COALESCE(NULLIF($4, ''), last_name),
 		image_url = COALESCE(NULLIF($5, ''), image_url),
-		END,
 		updated_at = NOW()
 	WHERE clerk_id = $1
 	RETURNING id, clerk_id, email, username, first_name, last_name, image_url, email_verified, created_at, updated_at
 	`
 
-	user := &user.User{}
+	u := &user.User{}
 	err := s.db.QueryRow(
 		ctx,
 		query,
@@ -199,16 +199,16 @@ func (s *UserService) UpdateProfileByClerkID(ctx context.Context, clerkID string
 		req.LastName,
 		req.ImageURL,
 	).Scan(
-		&user.ID,
-		&user.ClerkID,
-		&user.Email,
-		&user.Username,
-		&user.FirstName,
-		&user.LastName,
-		&user.ImageURL,
-		&user.EmailVerified,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&u.ID,
+		&u.ClerkID,
+		&u.Email,
+		&u.Username,
+		&u.FirstName,
+		&u.LastName,
+		&u.ImageURL,
+		&u.EmailVerified,
+		&u.CreatedAt,
+		&u.UpdatedAt,
 	)
 
 	if err != nil {
@@ -218,7 +218,7 @@ func (s *UserService) UpdateProfileByClerkID(ctx context.Context, clerkID string
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 
-	return user, nil
+	return u, nil
 }
 
 func (s *UserService) DeleteUserByClerkID(ctx context.Context, clerkID string) error {

@@ -2,22 +2,22 @@ package user
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	ID                    string                    `json:"id"`
-	ClerkID               string                    `json:"clerkId"`
-	Email                 string                    `json:"email"`
-	Username              string                    `json:"username"`
-	FirstName             string                    `json:"firstName"`
-	LastName              string                    `json:"lastName"`
-	ImageURL              string                    `json:"imageUrl,omitempty"`
-	EmailVerified         bool                      `json:"emailVerified"`
-	CreatedAt             time.Time                 `json:"createdAt"`
-	UpdatedAt             time.Time                 `json:"updatedAt"`
+	ID            uuid.UUID `json:"id"            db:"id"`
+	ClerkID       string    `json:"clerkId"       db:"clerk_id"`
+	Email         string    `json:"email"         db:"email"`
+	Username      string    `json:"username"      db:"username"`
+	FirstName     string    `json:"firstName"     db:"first_name"`
+	LastName      string    `json:"lastName"      db:"last_name"`
+	ImageURL      *string   `json:"imageUrl"      db:"image_url"` 
+	EmailVerified bool      `json:"emailVerified" db:"email_verified"`
+	CreatedAt     time.Time `json:"createdAt"     db:"created_at"`
+	UpdatedAt     time.Time `json:"updatedAt"     db:"updated_at"`
 }
-
-
 
 type CreateUserRequest struct {
 	ClerkID   string `json:"clerkId" validate:"required"`
@@ -34,3 +34,4 @@ type UpdateProfileRequest struct {
 	LastName  string `json:"lastName,omitempty"`
 	ImageURL  string `json:"imageUrl,omitempty"`
 }
+
