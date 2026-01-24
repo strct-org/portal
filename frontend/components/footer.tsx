@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="bg-gray-50 border-t border-gray-200 py-16 text-sm text-gray-500">
+    <footer className="bg-gray-50 border-t border-gray-200 py-8 text-sm text-gray-500">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
         <div>
           <h4 className="font-semibold text-gray-900 mb-4">Product</h4>
@@ -71,7 +71,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-6 mt-12 pt-8 border-t border-gray-200 text-xs">
+      <div className="max-w-7xl mx-auto px-6 mt-4 pt-6 border-t border-gray-200 text-xs">
         © 2024 Synology Inc. All rights reserved.
       </div>
     </footer>

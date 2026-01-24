@@ -31,22 +31,19 @@ export default function PortalPage() {
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden font-sans text-gray-900">
-      {/* Background Image */}
       <div className="absolute inset-0 -z-10 h-full w-full">
         <Image
-          src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=3000&auto=format&fit=crop"
+          src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=2070&auto=format&fit=crop"
           alt="BeeStation Background"
           fill
-          priority
+          unoptimized 
           className="object-cover object-center"
-          quality={100}
         />
         <div className="absolute inset-0 bg-black/5" />
       </div>
 
       <div className="flex min-h-screen flex-col items-center justify-center px-4 lg:flex-row lg:justify-end lg:pr-[15%]">
         <div className="w-full max-w-[400px] rounded-[32px] bg-white/85 p-10 text-center shadow-2xl backdrop-blur-xl transition-all duration-300 hover:shadow-3xl sm:p-12">
-          {/* Logo Section */}
           <div className="mb-6 flex justify-center">
             <div className="relative flex h-16 w-16 items-center justify-center text-black">
               <svg
@@ -65,9 +62,7 @@ export default function PortalPage() {
           <h1 className="mb-2 text-3xl font-bold text-gray-900">BeeStation</h1>
           <p className="mb-10 text-gray-600">Your personal cloud journey.</p>
 
-          {/* === LOGIC: Signed In vs Signed Out === */}
           {isSignedIn && user ? (
-            /* 1. USER IS LOGGED IN: Show Profile Card to Continue */
             <>
               <button
                 onClick={handleContinue}
@@ -103,12 +98,9 @@ export default function PortalPage() {
               </div>
             </>
           ) : (
-            /* 2. USER IS LOGGED OUT: Single Google Auth Button */
-            /* Ensure Google is enabled in Clerk Dashboard > User & Authentication > Social Connections */
             <div className="mb-6">
               <SignInButton mode="modal">
                 <button className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#2D3748] p-4 font-bold text-white transition-all hover:bg-black hover:shadow-lg cursor-pointer">
-                  {/* Google Icon SVG */}
                   <svg
                     className="h-5 w-5 bg-white rounded-full p-0.5"
                     viewBox="0 0 24 24"

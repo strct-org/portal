@@ -58,13 +58,13 @@ export default function Header() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/portal"
-              className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-black px-4 py-2 transition-colors"
-            >
-              <User size={18} className="stroke-[2.5px]" />
-              Sign In
-            </Link>
+              <Link
+                href="/portal"
+                className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-black px-4 py-2 transition-colors"
+              >
+                <User size={18} className="stroke-[2.5px]" />
+                Sign In
+              </Link>
 
             <div className="hidden md:flex items-center gap-2 bg-[#1d1d1f] text-white text-[14px] font-medium px-6 py-2.5 rounded-full hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-lg shadow-gray-900/10">
               <Link

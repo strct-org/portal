@@ -7,8 +7,25 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "images.unsplash.com", 
+        hostname: "portal.bee.synology.com",
       },
+      {
+        protocol: "https",
+        hostname: "bee.synology.com",
+      },
+      {
+        protocol: "https",
+     hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "source.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+      },
+      // --- ADD THIS ENTRY ---
       {
         protocol: "https",
         hostname: "img.clerk.com",
