@@ -13,11 +13,11 @@ const easeCustom = [0.25, 0.1, 0.25, 1];
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 60 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { duration: 1.0, ease: easeCustom } 
-  }
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 1.0, ease: easeCustom as any },
+  },
 };
 
 const staggerContainer = {
@@ -33,20 +33,26 @@ const staggerContainer = {
 
 const imagePop = {
   hidden: { opacity: 0, scale: 0.9, y: 40 },
-  visible: { 
-    opacity: 1, 
-    scale: 1, 
+  visible: {
+    opacity: 1,
+    scale: 1,
     y: 0,
-    transition: { duration: 1.2, ease: easeCustom }
-  }
+    transition: { duration: 1.2, ease: easeCustom as any },
+  },
 };
 
-const SectionWrapper = ({ children, delay = 0 }: { children: React.ReactNode, delay?: number }) => (
+const SectionWrapper = ({
+  children,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+}) => (
   <motion.div
     initial="hidden"
     whileInView="visible"
     viewport={{ once: true, margin: "-100px" }} // Triggers when 100px into view
-    transition={{ delay, duration: 0.8, ease: easeCustom }}
+    transition={{ delay, duration: 0.8, ease: easeCustom as any }}
     variants={fadeInUp}
   >
     {children}
@@ -61,31 +67,40 @@ export default function Home() {
 
   return (
     <main
-      className={`font-sans antialiased text-[#1d1d1f] bg-[#e3e1db] min-h-screen transition-opacity duration-700 ${loaded ? "opacity-100" : "opacity-0"}`}
+      className={`font-sans antialiased text-[#1d1d1f] bg-[#e3e1db] min-h-screen transition-opacity duration-700 ${
+        loaded ? "opacity-100" : "opacity-0"
+      }`}
     >
-
       <section className="relative pt-32 pb-0 md:pt-32 lg:pt-40 overflow-hidden min-h-[90vh] flex flex-col justify-between">
         <div className="absolute inset-0 bg-gradient-to-br from-[#ebe9e4] via-[#e3e1db] to-[#d6d4ce] -z-20"></div>
         <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-[#dcdad5] to-transparent opacity-50 -z-10 blur-3xl"></div>
-        
+
         <div className="max-w-[1400px] mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-10">
-          
-          <motion.div 
+          <motion.div
             className="lg:col-span-5 flex flex-col justify-center lg:block text-center lg:text-left pt-10"
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
           >
-            <motion.span variants={fadeInUp} className="text-2xl text-[#555] font-medium block mb-3">
+            <motion.span
+              variants={fadeInUp}
+              className="text-2xl text-[#555] font-medium block mb-3"
+            >
               BeeStation
             </motion.span>
 
-            <motion.h1 variants={fadeInUp} className="text-5xl md:text-6xl lg:text-[4.5rem] font-bold leading-[1.1] tracking-tight mb-10 text-[#24292f]">
+            <motion.h1
+              variants={fadeInUp}
+              className="text-5xl md:text-6xl lg:text-[4.5rem] font-bold leading-[1.1] tracking-tight mb-10 text-[#24292f]"
+            >
               Create your own cloud <br />
               in minutes
             </motion.h1>
 
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-16">
+            <motion.div
+              variants={fadeInUp}
+              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-16"
+            >
               <Link
                 href="/buy"
                 className="bg-[#ffc233] text-[#1d1d1f] px-10 py-3.5 text-center rounded-full font-semibold text-[17px] hover:bg-[#ecc04d] transition-colors shadow-sm min-w-[140px]"
@@ -100,7 +115,10 @@ export default function Home() {
               </Link>
             </motion.div>
 
-            <motion.div variants={fadeInUp} className="bg-[#f0efed]/80 backdrop-blur-md border border-white/40 p-5 rounded-xl inline-block max-w-xs text-left shadow-sm">
+            <motion.div
+              variants={fadeInUp}
+              className="bg-[#f0efed]/80 backdrop-blur-md border border-white/40 p-5 rounded-xl inline-block max-w-xs text-left shadow-sm"
+            >
               <div className="text-[#002855] font-bold text-lg mb-1 flex items-center gap-1">
                 Acronis{" "}
                 <span className="font-normal text-[#444]">True Image</span>
@@ -112,15 +130,14 @@ export default function Home() {
           </motion.div>
 
           <div className="lg:col-span-7 relative h-[600px] lg:h-auto flex items-end justify-center lg:justify-end gap-8 pb-10">
-            
-            <motion.div 
+            <motion.div
               className="relative z-20 flex flex-col items-center"
               initial="hidden"
               animate="visible"
               variants={imagePop}
               custom={1} // Used if we wanted dynamic delay based on index
             >
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.8 }}
@@ -128,11 +145,11 @@ export default function Home() {
               >
                 BeeStation
               </motion.div>
-              <motion.div 
-                 initial={{ scale: 0 }}
-                 animate={{ scale: 1 }}
-                 transition={{ delay: 1, type: "spring" }}
-                 className="absolute -top-10 left-4 w-1.5 h-1.5 bg-red-500 rounded-full"
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 1, type: "spring" }}
+                className="absolute -top-10 left-4 w-1.5 h-1.5 bg-red-500 rounded-full"
               ></motion.div>
 
               <div className="w-32 md:w-44 h-52 md:h-64 bg-gradient-to-r from-[#2a2a2c] to-[#1c1c1e] rounded-lg shadow-2xl flex flex-col items-center justify-end pb-4 relative border-r border-white/10">
@@ -147,14 +164,18 @@ export default function Home() {
               </div>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               className="relative z-10 flex flex-col items-center mb-10 md:mb-0"
               initial="hidden"
               animate="visible"
               variants={imagePop}
-              transition={{ delay: 0.3, duration: 1.2, ease: easeCustom }}
+              transition={{
+                delay: 0.3,
+                duration: 1.2,
+                ease: easeCustom as any,
+              }}
             >
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.1 }}
@@ -177,7 +198,7 @@ export default function Home() {
           </div>
         </div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.2, duration: 0.8 }}
@@ -198,7 +219,6 @@ export default function Home() {
         </motion.div>
       </section>
 
-      
       <SectionWrapper>
         <ProductComparison />
       </SectionWrapper>
@@ -214,7 +234,7 @@ export default function Home() {
       <div className="bg-white ">
         <div className="max-w-[1000px] mx-auto px-6 py-8">
           <SectionWrapper>
-             <FAQ />
+            <FAQ />
           </SectionWrapper>
         </div>
       </div>
