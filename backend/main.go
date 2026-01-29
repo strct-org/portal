@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	dbPool              *pgxpool.Pool
-	userService         *services.UserService
+	dbPool      *pgxpool.Pool
+	userService *services.UserService
 )
 
 func main() {
@@ -36,7 +36,6 @@ func main() {
 	}
 	clerk.SetKey(clerkSecretKey)
 	log.Println("Clerk initialized")
-
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -96,7 +95,6 @@ func main() {
 		w.Write([]byte(`{"status": "healthy", "service": "outDrinkMe-api"}`))
 	}).Methods("GET")
 
-
 	standardRouter := r.PathPrefix("/").Subrouter()
 	// standardRouter.Use(middleware.RateLimitMiddleware)
 	// standardRouter.Use(middleware.MonitorMiddleware)
@@ -107,7 +105,11 @@ func main() {
 	assetsDir := "./assets"
 	fs := http.FileServer(http.Dir(assetsDir))
 	standardRouter.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", fs))
-	log.Printf("Serving static files from %s at /assets/", assetsDir)
+
+	updatesDir := "./updates"
+	updatesFS := http.FileServer(http.Dir(updatesDir))
+
+	standardRouter.PathPrefix("/agent_updates/").Handler(http.StripPrefix("/agent_updates/", updatesFS)).Methods("GET")
 
 	standardRouter.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
 
@@ -127,8 +129,6 @@ func main() {
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")
-	
-
 
 	corsHandler := gorilllaHandlers.CORS(
 		gorilllaHandlers.AllowedOrigins([]string{"*"}),
