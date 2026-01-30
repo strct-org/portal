@@ -26,6 +26,8 @@ func NewClerkHandler(userService *services.UserService) *ClerkHandler {
 }
 
 func (h *ClerkHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Request) {
+	log.Println("PERSISTING NEW USER TO DB FROM CLERK WEBHOOK")
+
 	// 1. Get the Webhook Secret from ENV
 	secret := os.Getenv("CLERK_WEBHOOK_SECRET")
 	if secret == "" {
@@ -81,7 +83,6 @@ func (h *ClerkHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(http.StatusOK)
 }
-
 
 func (h *ClerkHandler) handleUserCreated(data json.RawMessage) {
 	var clerkUser clerk.ClerkUserData
