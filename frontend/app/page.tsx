@@ -41,6 +41,7 @@ const imagePop = {
   },
 };
 
+
 const SectionWrapper = ({
   children,
   delay = 0,

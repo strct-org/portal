@@ -67,7 +67,7 @@ func main() {
 	userService = services.NewUserService(dbPool)
 
 	userHandler := handlers.NewUserHandler(userService)
-	webhookHandler := handlers.NewWebhookHandler(userService)
+	webhookHandler := handlers.NewClerkHandler(userService)
 
 	go func() {
 		for i := 0; i < 3; i++ {
