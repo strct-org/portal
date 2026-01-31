@@ -1,3 +1,4 @@
+import { Device } from "./types/api.device";
 import { User } from "./types/api.user";
 
 class ApiService {
@@ -63,7 +64,7 @@ class ApiService {
     }
   }
 
-  async fetchUser(token: string, retries = 5): Promise<User> {
+  async getUser(token: string, retries = 5): Promise<User> {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         console.log(`Fetch user attempt ${attempt + 1}/${retries + 1}`);
@@ -98,6 +99,12 @@ class ApiService {
     });
   }
 
+  async deleteUser(token: string): Promise<void> {
+    return this.makeRequest<void>("/api/v1/user", {
+      method: "DELETE",
+      token,
+    });
+  }
   // async updateUserProfile(
   //   updateReq: UpdateUserProfileReq,
   //   token: string
@@ -109,17 +116,11 @@ class ApiService {
   //   });
   // }
 
-  async deleteUser(token: string): Promise<void> {
-    return this.makeRequest<void>("/api/v1/user", {
-      method: "DELETE",
+  async getDevices(token: string): Promise<Device[]> {
+    return this.makeRequest<Device[]>("/api/v1/device", {
+      method: "GET",
       token,
     });
-  }
-
-  getWebSocketUrl(sessionId: string): string {
-    const rawHost = this.baseUrl.replace(/^https?:\/\//, "");
-    const protocol = this.baseUrl.startsWith("https") ? "wss" : "ws";
-    return `${protocol}://${rawHost}/api/v1/drinking-games/ws/${sessionId}`;
   }
 }
 

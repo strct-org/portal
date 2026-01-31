@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Menu, X, ArrowRight, User } from "lucide-react";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { usePortal } from "@/providers/PortalProvider";
+import Image from "next/image";
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const { user, isSignedIn } = useUser();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,6 +63,16 @@ export default function Header() {
           </div>
 
           <div className="flex items-center gap-3">
+            {user && isSignedIn ? (
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200">
+                <Image
+                  src={user.imageUrl}
+                  alt={user.fullName || "User"}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            ) : (
               <Link
                 href="/portal"
                 className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-black px-4 py-2 transition-colors"
@@ -65,13 +80,10 @@ export default function Header() {
                 <User size={18} className="stroke-[2.5px]" />
                 Sign In
               </Link>
+            )}
 
             <div className="hidden md:flex items-center gap-2 bg-[#1d1d1f] text-white text-[14px] font-medium px-6 py-2.5 rounded-full hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-lg shadow-gray-900/10">
-              <Link
-                href="/buy"
-              >
-                Buy Now
-              </Link>
+              <Link href="/buy">Buy Now</Link>
             </div>
 
             <button
