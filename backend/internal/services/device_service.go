@@ -144,3 +144,68 @@ func (s *DeviceService) ClaimDevice(ctx context.Context, clerkID string, serialN
 
 	return newDevice, nil
 }
+
+func (s *DeviceService) GetParams(ctx context.Context, clerkID string, deviceID string) (*device.Params, error) {
+	user, err := utils.GetUserByClerkID(ctx, s.db, clerkID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to identify user: %w", err)
+	}
+
+	query := `
+		SELECT is_online, last_seen, local_ip, version, updated_at
+		FROM devices
+		WHERE id = $1 AND owner_id = $2
+	`
+
+	var p device.Params
+	err = s.db.QueryRow(ctx, query, deviceID, user.ID).Scan(
+		&p.IsOnline,
+		&p.LastSeen,
+		&p.LocalIP,
+		&p.Version,
+		&p.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("device not found or access denied")
+		}
+		return nil, fmt.Errorf("failed to scan device params: %w", err)
+	}
+
+	return &p, nil
+}
+
+
+func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdate) (*device.Params, error) {
+	query := `
+		UPDATE devices 
+		SET 
+			is_online = $1,
+			local_ip = $2, 
+			version = $3, 
+			last_seen = NOW(), 
+			updated_at = NOW()
+		WHERE id = $4
+		RETURNING is_online, last_seen, local_ip, version, updated_at
+	`
+
+	var p device.Params
+
+	err := s.db.QueryRow(ctx, query, req.IsOnline, req.LocalIP, req.Version, req.ID).Scan(
+		&p.IsOnline,
+		&p.LastSeen,
+		&p.LocalIP,
+		&p.Version,
+		&p.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("device not found")
+		}
+		return nil, fmt.Errorf("failed to update device params: %w", err)
+	}
+
+	return &p, nil
+}

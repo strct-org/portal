@@ -42,7 +42,6 @@ func (h *DeviceHandler) GetDevices(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJSON(w, http.StatusOK, devices)
 }
 
-
 func (h *DeviceHandler) ClaimDevice(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -53,14 +52,12 @@ func (h *DeviceHandler) ClaimDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	var req device.ClaimDeviceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("AddFriend Handler: Failed to decode request body: %v", err)
+		log.Printf("ClaimDevice Handler: Failed to decode request body: %v", err)
 		utils.RespondWithJSON(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-
 
 	success, err := h.deviceService.ClaimDevice(ctx, clerkID, req.SerialNumber, req.ClaimToken, req.FriendlyName)
 	if err != nil {
@@ -71,3 +68,42 @@ func (h *DeviceHandler) ClaimDevice(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJSON(w, http.StatusOK, success)
 }
 
+func (h *DeviceHandler) GetParams(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	clerkID, ok := middleware.GetClerkID(ctx)
+	if !ok {
+		utils.RespondWithError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+	deviceId := r.URL.Query().Get("device_id")
+
+	params, err := h.deviceService.GetParams(ctx, clerkID, deviceId)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusNotFound, "Failed to get device params")
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, params)
+}
+
+func (h *DeviceHandler) UpdateParams(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var req device.ParamsUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("UpdateParams Handler: Failed to decode request body: %v", err)
+		utils.RespondWithJSON(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	params, err := h.deviceService.UpdateParams(ctx, req)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusNotFound, "Failed to update device params")
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, params)
+}

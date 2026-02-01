@@ -132,6 +132,9 @@ func main() {
 
 	protected.HandleFunc("/device", deviceHandler.GetDevices).Methods("GET")
 	protected.HandleFunc("/device/claim", deviceHandler.ClaimDevice).Methods("POST")
+	protected.HandleFunc("/device/params", deviceHandler.GetParams).Methods("GET")
+	protected.HandleFunc("/device/agent/params", deviceHandler.UpdateParams).Methods("PUT") //req comes from device agent
+
 	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")
 

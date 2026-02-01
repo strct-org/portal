@@ -38,3 +38,5 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondWithJSON(w, http.StatusOK, user)
 }
+
+
