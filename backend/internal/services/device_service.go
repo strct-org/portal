@@ -116,9 +116,12 @@ func (s *DeviceService) ClaimDevice(ctx context.Context, clerkID string, serialN
 	}
 
 	insertQuery := `
-		INSERT INTO devices (id, owner_id, friendly_name, is_online, created_at, updated_at)
-		VALUES ($1, $2, $3, FALSE, NOW(), NOW())
-		RETURNING id, owner_id, friendly_name, is_online, last_seen, local_ip, version, created_at, updated_at
+		INSERT INTO devices 
+			(id, owner_id, friendly_name, is_online, local_ip, version, last_seen, created_at, updated_at)
+		VALUES 
+			($1, $2, $3, FALSE, '', '', NOW(), NOW(), NOW())
+		RETURNING 
+			id, owner_id, friendly_name, is_online, last_seen, local_ip, version, created_at, updated_at
 	`
 
 	newDevice := &device.Device{}
@@ -177,7 +180,7 @@ func (s *DeviceService) GetParams(ctx context.Context, clerkID string, deviceID 
 }
 
 
-func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdate) (*device.Params, error) {
+func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdate, deviceID string) (*device.Params, error) {
 	query := `
 		UPDATE devices 
 		SET 
@@ -192,7 +195,7 @@ func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdat
 
 	var p device.Params
 
-	err := s.db.QueryRow(ctx, query, req.IsOnline, req.LocalIP, req.Version, req.ID).Scan(
+	err := s.db.QueryRow(ctx, query, req.IsOnline, req.LocalIP, req.Version, deviceID).Scan(
 		&p.IsOnline,
 		&p.LastSeen,
 		&p.LocalIP,

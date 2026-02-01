@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/strct-org/portal/backend/internal/services"
 	"github.com/strct-org/portal/backend/internal/types/device"
 	"github.com/strct-org/portal/backend/middleware"
@@ -77,7 +78,9 @@ func (h *DeviceHandler) GetParams(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithError(w, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
-	deviceId := r.URL.Query().Get("device_id")
+
+	vars := mux.Vars(r)
+	deviceId := vars["device_id"]
 
 	params, err := h.deviceService.GetParams(ctx, clerkID, deviceId)
 	if err != nil {
@@ -99,7 +102,10 @@ func (h *DeviceHandler) UpdateParams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params, err := h.deviceService.UpdateParams(ctx, req)
+	vars := mux.Vars(r)
+	deviceId := vars["device_id"]
+
+	params, err := h.deviceService.UpdateParams(ctx, req, deviceId)
 	if err != nil {
 		utils.RespondWithError(w, http.StatusNotFound, "Failed to update device params")
 		return

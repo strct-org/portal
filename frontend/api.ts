@@ -1,4 +1,4 @@
-import { Device } from "./types/api.device";
+import { Device, DeviceParams } from "./types/api.device";
 import { User } from "./types/api.user";
 
 class ApiService {
@@ -48,7 +48,7 @@ class ApiService {
       );
 
       if (response.status === 404) {
-        throw new Error("USER_NOT_FOUND");
+        throw new Error(response.statusText);
       }
 
       throw new Error(`API Error: ${response.status} - ${errorText}`);
@@ -120,6 +120,13 @@ class ApiService {
 
   async getDevices(token: string): Promise<Device[]> {
     return this.makeRequest<Device[]>("/api/v1/device", {
+      method: "GET",
+      token,
+    });
+  }
+
+  async getDevicesParams(token: string, deviceId: string): Promise<DeviceParams> {
+    return this.makeRequest<DeviceParams>(`/api/v1/device/params/${deviceId}`, {
       method: "GET",
       token,
     });

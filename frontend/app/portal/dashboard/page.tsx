@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -15,23 +15,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiService } from "@/api";
 import { usePortal } from "@/providers/PortalProvider";
 import { useAuth } from "@clerk/nextjs";
+import { DeviceParams } from "@/types/api.device";
 
-const generateDeviceStats = (device: any) => {
-  const seed = device.id
+const generateStorageStats = (deviceId: string) => {
+  const seed = deviceId
     .split("")
     .reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-  const isOnline =
-    device.is_online !== undefined ? device.is_online : seed % 5 !== 0;
 
   const totalStorageGB = 1024;
-
   const usedStorageGB = (seed * 137) % 950;
-
   const percentage = Math.round((usedStorageGB / totalStorageGB) * 100);
   const availableGB = totalStorageGB - usedStorageGB;
 
   return {
-    isOnline,
     totalStorageGB,
     usedStorageGB,
     availableGB,
@@ -63,7 +59,7 @@ export default function DashboardPage() {
           <AddDeviceModal
             onClose={() => setIsAddModalOpen(false)}
             onSuccess={(newDevice) => {
-              addDeviceToState(newDevice); // Optimistic Update
+              addDeviceToState(newDevice);
               setIsAddModalOpen(false);
             }}
           />
@@ -72,8 +68,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-// --- Sub Components ---
 
 function DashboardView({
   devices,
@@ -84,13 +78,6 @@ function DashboardView({
   isLoading: boolean;
   onAddDevice: () => void;
 }) {
-  const router = useRouter();
-
-  const handleDeviceClick = (deviceId: string) => {
-    console.log(deviceId);
-    router.push(`/portal/${deviceId}`);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -122,79 +109,9 @@ function DashboardView({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {devices &&
-            devices.map((device) => {
-              const stats = generateDeviceStats(device);
-
-              return (
-                <div
-                  key={device.id}
-                  onClick={() => handleDeviceClick(device.id)}
-                  className={`group relative bg-white rounded-[2rem] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.04)] border border-white/50 hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)] transition-all duration-500 cursor-pointer overflow-hidden ${
-                    !stats.isOnline ? "grayscale opacity-80" : ""
-                  }`}
-                >
-                  {/* Status Badge */}
-                  <div className="absolute top-6 right-6 flex items-center gap-2">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        stats.isOnline
-                          ? "bg-green-500 shadow-[0_0_10px_#22c55e]"
-                          : "bg-red-400"
-                      }`}
-                    ></span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                      {stats.isOnline ? "Online" : "Offline"}
-                    </span>
-                  </div>
-
-                  {/* Icon */}
-                  <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                    <HardDrive size={32} className="text-[#1d1d1f]" />
-                  </div>
-
-                  {/* Title & IP */}
-                  <h3 className="text-xl font-bold text-[#1d1d1f] mb-1">
-                    {device.friendly_name || device.id}
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-8 font-mono">
-                    {stats.isOnline
-                      ? device.local_ip || "192.168.1.XX"
-                      : "Unreachable"}
-                  </p>
-
-                  {/* Storage Progress */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="text-gray-600">Storage Used</span>
-                      <span className="text-[#1d1d1f]">
-                        {formatStorage(stats.usedStorageGB)} /{" "}
-                        {formatStorage(stats.totalStorageGB)}
-                      </span>
-                    </div>
-
-                    {/* Progress Bar Background */}
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      {/* Actual Progress Bar */}
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                          stats.percentage > 90 ? "bg-red-500" : "bg-[#ffc233]"
-                        }`}
-                        style={{ width: `${stats.percentage}%` }}
-                      />
-                    </div>
-
-                    <div className="text-right text-[10px] text-gray-400 font-medium">
-                      {formatStorage(stats.availableGB)} Free
-                    </div>
-                  </div>
-
-                  {/* Action Link (Visible on Hover) */}
-                  <div className="mt-8 flex items-center text-sm font-bold text-[#ffc233] opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
-                    Manage Device <ChevronRight size={16} />
-                  </div>
-                </div>
-              );
-            })}
+            devices.map((device) => (
+              <DeviceCard key={device.id} initialDevice={device} />
+            ))}
 
           {/* Add New Card */}
           <div
@@ -212,6 +129,147 @@ function DashboardView({
         </div>
       )}
     </motion.div>
+  );
+}
+
+function DeviceCard({ initialDevice }: { initialDevice: any }) {
+  const router = useRouter();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+
+  const [params, setParams] = useState<DeviceParams | null>(null);
+  const [loadingParams, setLoadingParams] = useState(true);
+
+  const storageStats = generateStorageStats(initialDevice.id);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchParams = async () => {
+      // DEBUG 1: Check if function starts
+      console.log(`[${initialDevice.id}] 1. Starting fetchParams...`);
+
+      try {
+        // DEBUG 2: Check Auth State
+        if (!isLoaded || !isSignedIn) {
+          console.log(`[${initialDevice.id}] Auth not ready yet.`);
+          return;
+        }
+
+        const token = await getToken();
+
+        // DEBUG 3: Check Token
+        if (!token) {
+          console.warn(
+            `[${initialDevice.id}] 2. No token retrieved. Aborting.`
+          );
+          return;
+        }
+        console.log(`[${initialDevice.id}] 2. Token retrieved. Calling API...`);
+
+        // DEBUG 4: API Call
+        const data = await apiService.getDevicesParams(token, initialDevice.id);
+        console.log(`[${initialDevice.id}] 3. API Success:`, data);
+
+        if (isMounted) {
+          setParams(data);
+        }
+      } catch (error) {
+        console.error(`[${initialDevice.id}] ERROR:`, error);
+      } finally {
+        if (isMounted) setLoadingParams(false);
+      }
+    };
+
+    if (initialDevice?.id) {
+      fetchParams();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialDevice.id, getToken, isLoaded, isSignedIn]);
+
+  // Priority logic: If API params exist, use them. Otherwise, use initial props.
+  const currentDevice = params || initialDevice;
+
+  // Specific checks
+  const isOnline = params ? params.is_online : initialDevice.is_online;
+  const localIp = params ? params.local_ip : initialDevice.local_ip;
+  const friendlyName = initialDevice.friendly_name || initialDevice.id;
+
+  const handleDeviceClick = () => {
+    router.push(`/portal/${initialDevice.id}`);
+  };
+
+  return (
+    <div
+      onClick={handleDeviceClick}
+      className={`group relative bg-white rounded-[2rem] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.04)] border border-white/50 hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)] transition-all duration-500 cursor-pointer overflow-hidden ${
+        !isOnline ? "grayscale opacity-80" : ""
+      }`}
+    >
+      {/* Status Badge */}
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        {loadingParams ? (
+          <Loader2 size={12} className="animate-spin text-gray-400" />
+        ) : (
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isOnline ? "bg-green-500 shadow-[0_0_10px_#22c55e]" : "bg-red-400"
+            }`}
+          ></span>
+        )}
+        <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+          {isOnline ? "Online" : "Offline"}
+        </span>
+      </div>
+
+      {/* Icon */}
+      <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+        <HardDrive size={32} className="text-[#1d1d1f]" />
+      </div>
+
+      {/* Title & IP */}
+      <h3 className="text-xl font-bold text-[#1d1d1f] mb-1">{friendlyName}</h3>
+      <p className="text-sm text-gray-500 mb-8 font-mono h-5 flex items-center">
+        {isOnline ? (
+          localIp || "Negotiating IP..."
+        ) : (
+          <span className="flex items-center gap-1">Unreachable</span>
+        )}
+      </p>
+
+      {/* Storage Progress */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-xs font-medium">
+          <span className="text-gray-600">Storage Used</span>
+          <span className="text-[#1d1d1f]">
+            {formatStorage(storageStats.usedStorageGB)} /{" "}
+            {formatStorage(storageStats.totalStorageGB)}
+          </span>
+        </div>
+
+        {/* Progress Bar Background */}
+        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+          {/* Actual Progress Bar */}
+          <div
+            className={`h-full rounded-full transition-all duration-1000 ease-out ${
+              storageStats.percentage > 90 ? "bg-red-500" : "bg-[#ffc233]"
+            }`}
+            style={{ width: `${storageStats.percentage}%` }}
+          />
+        </div>
+
+        <div className="text-right text-[10px] text-gray-400 font-medium">
+          {formatStorage(storageStats.availableGB)} Free
+        </div>
+      </div>
+
+      {/* Action Link (Visible on Hover) */}
+      <div className="mt-8 flex items-center text-sm font-bold text-[#ffc233] opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
+        Manage Device <ChevronRight size={16} />
+      </div>
+    </div>
   );
 }
 

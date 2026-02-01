@@ -125,15 +125,17 @@ func main() {
 	// api.HandleFunc("/delete-account-webpage", userHandler.DeleteAccountPage).Methods("GET")
 	// api.HandleFunc("/delete-account-details-webpage", userHandler.UpdateAccountPage).Methods("GET")
 
-	protected := api.PathPrefix("").Subrouter()
+	// protected := api.PathPrefix("").Subrouter()
+	protected := api.NewRoute().Subrouter()
+
 	protected.Use(middleware.ClerkAuthMiddleware)
 
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 
 	protected.HandleFunc("/device", deviceHandler.GetDevices).Methods("GET")
 	protected.HandleFunc("/device/claim", deviceHandler.ClaimDevice).Methods("POST")
-	protected.HandleFunc("/device/params", deviceHandler.GetParams).Methods("GET")
-	protected.HandleFunc("/device/agent/params", deviceHandler.UpdateParams).Methods("PUT") //req comes from device agent
+	protected.HandleFunc("/device/params/{device_id}", deviceHandler.GetParams).Methods("GET")
+	protected.HandleFunc("/device/agent/params/{device_id}", deviceHandler.UpdateParams).Methods("PUT") //req comes from device agent
 
 	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")
