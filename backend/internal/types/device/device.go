@@ -28,3 +28,9 @@ type FileMetadata struct {
 	IsStarred bool      `json:"is_starred"    db:"is_starred"`
 	CreatedAt time.Time `json:"created_at"    db:"created_at"`
 }
+
+type ClaimDeviceRequest struct {
+	SerialNumber string `json:"serial_number,omitempty"`
+	ClaimToken   string `json:"claim_token,omitempty"`
+	FriendlyName string `json:"friendly_name,omitempty"`
+}

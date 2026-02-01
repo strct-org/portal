@@ -21,8 +21,9 @@ import (
 )
 
 var (
-	dbPool      *pgxpool.Pool
-	userService *services.UserService
+	dbPool        *pgxpool.Pool
+	userService   *services.UserService
+	deviceService *services.DeviceService
 )
 
 func main() {
@@ -65,8 +66,10 @@ func main() {
 	}()
 
 	userService = services.NewUserService(dbPool)
+	deviceService = services.NewDeviceService(dbPool)
 
 	userHandler := handlers.NewUserHandler(userService)
+	deviceHandler := handlers.NewDeviceHandler(deviceService)
 	webhookHandler := handlers.NewClerkHandler(userService)
 
 	go func() {
@@ -118,7 +121,6 @@ func main() {
 	// api.HandleFunc("/privacy-policy", docHandler.ServePrivacyPolicy).Methods("GET")
 	// api.HandleFunc("/terms-of-services", docHandler.ServeTermsOfServices).Methods("GET")
 	// api.HandleFunc("/refund-policy", docHandler.ServeRefundPolicy).Methods("GET")
-	// api.HandleFunc("/pricing", docHandler.ServePricing).Methods("GET")
 
 	// api.HandleFunc("/delete-account-webpage", userHandler.DeleteAccountPage).Methods("GET")
 	// api.HandleFunc("/delete-account-details-webpage", userHandler.UpdateAccountPage).Methods("GET")
@@ -127,6 +129,9 @@ func main() {
 	protected.Use(middleware.ClerkAuthMiddleware)
 
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
+
+	protected.HandleFunc("/device", deviceHandler.GetDevices).Methods("GET")
+	protected.HandleFunc("/device/claim", deviceHandler.ClaimDevice).Methods("POST")
 	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")
 

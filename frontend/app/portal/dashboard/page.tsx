@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Plus,
   Settings,
@@ -8,22 +8,18 @@ import {
   Search,
   ArrowLeft,
   Share2,
-  FileText,
-  Image as ImageIcon,
   X,
   Send,
-  Cloud,
   ChevronRight,
-  Wifi,
   Check,
   Loader2,
-  Smartphone,
   QrCode,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { apiService } from "@/api"; // Assuming you have this
+import { apiService } from "@/api";
 import { usePortal } from "@/providers/PortalProvider";
+import { useAuth } from "@clerk/nextjs";
 
 const FRIENDS = [
   {
@@ -266,7 +262,6 @@ function DeviceDetailView({
         </div>
       </div>
 
-      {/* (Rest of Device Detail View is purely visual, keeping it concise for this answer) */}
       <div className="bg-white p-8 rounded-3xl text-center text-gray-500">
         File Browser placeholder for {device.friendly_name}
       </div>
@@ -283,9 +278,6 @@ function DeviceDetailView({
   );
 }
 
-// ----------------------------------------------------------------------------
-// MODAL: ADD DEVICE (Connected to API)
-// ----------------------------------------------------------------------------
 function AddDeviceModal({
   onClose,
   onSuccess,
@@ -293,9 +285,11 @@ function AddDeviceModal({
   onClose: () => void;
   onSuccess: (d: any) => void;
 }) {
+  const { getToken } = useAuth();
   const [step, setStep] = useState<"input" | "connecting" | "error">("input");
   const [serialId, setSerialId] = useState("");
   const [pin, setPin] = useState("");
+  const [deviceName, setDeviceName] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleClaim = async () => {
@@ -305,30 +299,19 @@ function AddDeviceModal({
     setErrorMsg("");
 
     try {
-      // ------------------------------------------------
-      // REAL API CALL HERE
-      // ------------------------------------------------
-      // This endpoint checks 'manufactured_devices', verifies pin,
-      // and inserts into 'devices' table.
-      // const newDevice = await apiService.claimDevice({ id: serialId, token: pin });
+      const token = await getToken();
+      if (!token) return;
 
-      // MOCKING THE API CALL RESPONSE FOR DEMO:
-      await new Promise((r) => setTimeout(r, 2000));
+      const newDevice = await apiService.claimDevice(
+        {
+          serial_number: serialId,
+          claim_token: pin,
+          friendly_name: deviceName,
+        },
+        token
+      );
 
-      // Simulate Database Check
-      if (serialId === "BEE-8829-AB" && pin === "123456") {
-        const mockNewDevice = {
-          id: serialId,
-          owner_id: "user_123",
-          friendly_name: "New BeeStation",
-          is_online: true,
-          local_ip: "10.0.0.50",
-          created_at: new Date().toISOString(),
-        };
-        onSuccess(mockNewDevice);
-      } else {
-        throw new Error("Invalid Serial Number or PIN");
-      }
+      onSuccess(newDevice);
     } catch (err: any) {
       setStep("error");
       setErrorMsg(err.message || "Failed to pair device");
@@ -378,7 +361,7 @@ function AddDeviceModal({
                 <input
                   value={serialId}
                   onChange={(e) => setSerialId(e.target.value)}
-                  placeholder="e.g. BEE-8829-AB"
+                  placeholder="BEE-8829-AB"
                   className="w-full mt-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#ffc233] focus:outline-none font-mono"
                 />
               </div>
@@ -390,7 +373,19 @@ function AddDeviceModal({
                   type="password"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  placeholder="e.g. 123456"
+                  placeholder="Secret Pass"
+                  className="w-full mt-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#ffc233] focus:outline-none font-mono tracking-widest"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
+                  Name Your Device
+                </label>
+                <input
+                  value={deviceName}
+                  onChange={(e) => setDeviceName(e.target.value)}
+                  placeholder="My Device"
                   className="w-full mt-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#ffc233] focus:outline-none font-mono tracking-widest"
                 />
               </div>
@@ -405,7 +400,7 @@ function AddDeviceModal({
                   : "bg-[#1d1d1f] text-white hover:bg-black shadow-lg"
               }`}
             >
-              Verify & Pair
+              Claim
             </button>
           </div>
         )}

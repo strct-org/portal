@@ -1,3 +1,5 @@
+"use client";
+
 import { apiService } from "@/api";
 import { Device } from "@/types/api.device";
 import { User } from "@/types/api.user";
@@ -12,7 +14,7 @@ import {
   useState,
 } from "react";
 
-interface AppContextType {
+interface PortalContextType {
   user: User | null;
   devices: Device[];
 
@@ -29,13 +31,13 @@ interface AppContextType {
   error: string | null;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const PortalContext = createContext<PortalContextType | undefined>(undefined);
 
-interface AppProviderProps {
+interface PortalProviderProps {
   children: ReactNode;
 }
 
-export function AppProvider({ children }: AppProviderProps) {
+export function PortalProvider({ children }: PortalProviderProps) {
   const { getToken, isSignedIn } = useAuth();
 
   const [user, setUser] = useState<User | null>(null);
@@ -92,7 +94,7 @@ export function AppProvider({ children }: AppProviderProps) {
       async () => {
         const token = await getToken();
         if (!token) throw new Error("No auth token");
-        return await apiService.getDevices(token); 
+        return await apiService.getDevices(token);
       },
       (data) => setDevices(data),
       true // Skip global loading spinner for device refreshes
@@ -164,7 +166,7 @@ export function AppProvider({ children }: AppProviderProps) {
     initApp();
   }, [isSignedIn, refreshAll]);
 
-  const value: AppContextType = {
+  const value: PortalContextType = {
     user,
     devices,
     refreshUser,
@@ -178,13 +180,15 @@ export function AppProvider({ children }: AppProviderProps) {
     error,
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <PortalContext.Provider value={value}>{children}</PortalContext.Provider>
+  );
 }
 
 export function usePortal() {
-  const context = useContext(AppContext);
+  const context = useContext(PortalContext);
   if (context === undefined) {
-    throw new Error("usePortal must be used within an AppProvider");
+    throw new Error("usePortal must be used within an PortalProvider");
   }
   return context;
 }

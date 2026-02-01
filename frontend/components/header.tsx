@@ -64,14 +64,19 @@ export default function Header() {
 
           <div className="flex items-center gap-3">
             {user && isSignedIn ? (
-              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200">
-                <Image
-                  src={user.imageUrl}
-                  alt={user.fullName || "User"}
-                  fill
-                  className="object-cover"
-                />
-              </div>
+              <Link
+                href="/portal/dashboard"
+                className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-black px-4 py-2 transition-colors"
+              >
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200">
+                  <Image
+                    src={user.imageUrl}
+                    alt={user.fullName || "User"}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </Link>
             ) : (
               <Link
                 href="/portal"

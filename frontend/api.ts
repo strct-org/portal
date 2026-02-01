@@ -105,6 +105,8 @@ class ApiService {
       token,
     });
   }
+
+  //TODO
   // async updateUserProfile(
   //   updateReq: UpdateUserProfileReq,
   //   token: string
@@ -120,6 +122,21 @@ class ApiService {
     return this.makeRequest<Device[]>("/api/v1/device", {
       method: "GET",
       token,
+    });
+  }
+
+  async claimDevice(
+    args: {
+      serial_number: string;
+      claim_token: string;
+      friendly_name: string;
+    },
+    token: string
+  ): Promise<Device> {
+    return this.makeRequest<Device>("/api/v1/device/claim", {
+      method: "POST",
+      token,
+      body: JSON.stringify(args),
     });
   }
 }
