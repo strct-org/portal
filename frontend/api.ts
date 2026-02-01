@@ -5,10 +5,10 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    const apiUrl = process.env.EXPO_PUBLIC_OUTDRINKME_API_URL;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     if (!apiUrl) {
-      console.warn("EXPO_PUBLIC_OUTDRINKME_API_URL not set, using localhost");
+      console.warn("NEXT_PUBLIC_API_URL not set, using localhost");
     }
 
     this.baseUrl = apiUrl || "http://localhost:3000";
@@ -68,7 +68,7 @@ class ApiService {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         console.log(`Fetch user attempt ${attempt + 1}/${retries + 1}`);
-
+        console.log(token);
         return await this.makeRequest<User>("/api/v1/user", {
           method: "GET",
           token,

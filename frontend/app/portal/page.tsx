@@ -136,7 +136,6 @@ export default function PortalPage() {
   );
 }
 
-// --- Components ---
 
 function Footer() {
   return (

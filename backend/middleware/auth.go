@@ -71,7 +71,6 @@ func OptionalAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Helper to extract Clerk ID from context in your handlers
 func GetClerkID(ctx context.Context) (string, bool) {
 	clerkID, ok := ctx.Value(ClerkIDKey).(string)
 	return clerkID, ok

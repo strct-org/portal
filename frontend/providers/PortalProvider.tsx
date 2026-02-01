@@ -124,6 +124,7 @@ export function PortalProvider({ children }: PortalProviderProps) {
       }
 
       if (devicesResult.status === "fulfilled") {
+        console.log(devicesResult.value)
         setDevices(devicesResult.value);
       } else {
         console.error("Failed to fetch devices:", devicesResult.reason);
@@ -138,9 +139,9 @@ export function PortalProvider({ children }: PortalProviderProps) {
   }, [isSignedIn, getToken]);
 
   const addDeviceToState = (newDevice: Device) => {
-    setDevices((prev) => [...prev, newDevice]);
+    setDevices((prev) => [...(prev || []), newDevice]);
   };
-
+  
   const updateDeviceInState = (updatedDevice: Device) => {
     setDevices((prev) =>
       prev.map((d) => (d.id === updatedDevice.id ? updatedDevice : d))
