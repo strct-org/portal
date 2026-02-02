@@ -143,21 +143,18 @@ function DeviceCard({
   isChecking,
 }: {
   device: any;
-  liveStats?: DeviceLiveStats; // Optional because it might not be loaded yet
+  liveStats?: DeviceLiveStats; 
   isChecking: boolean;
 }) {
   const router = useRouter();
 
-  // Defaults if stats aren't loaded or device is offline
   const isOnline = liveStats?.isOnline ?? false;
   const usedBytes = liveStats?.storageUsed || 0;
-  const totalBytes = liveStats?.storageTotal || 1; // avoid divide by zero
+  const totalBytes = liveStats?.storageTotal || 1; 
   const percentage = Math.min(Math.round((usedBytes / totalBytes) * 100), 100);
   const freeBytes = totalBytes - usedBytes;
 
   const handleDeviceClick = () => {
-    // Only allow navigation if online? Or let them go to settings regardless?
-    // Usually, we want to let them click.
     router.push(`/portal/${device.id}`);
   };
 
@@ -168,7 +165,6 @@ function DeviceCard({
         !isOnline && !isChecking ? "grayscale opacity-80" : ""
       }`}
     >
-      {/* Status Badge */}
       <div className="absolute top-6 right-6 flex items-center gap-2">
         {isChecking && !liveStats ? (
           <Loader2 size={12} className="animate-spin text-gray-400" />
@@ -188,12 +184,10 @@ function DeviceCard({
         </span>
       </div>
 
-      {/* Icon */}
       <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
         <Server size={32} className="text-[#1d1d1f]" />
       </div>
 
-      {/* Title & IP */}
       <h3 className="text-xl font-bold text-[#1d1d1f] mb-1">
         {device.friendly_name || device.id}
       </h3>
@@ -205,7 +199,6 @@ function DeviceCard({
         )}
       </p>
 
-      {/* Storage Progress */}
       <div className="space-y-2">
         <div className="flex justify-between text-xs font-medium">
           <span className="text-gray-600">Storage Used</span>

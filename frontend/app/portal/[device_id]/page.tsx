@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Settings,
@@ -21,6 +21,10 @@ import {
   Music,
   Video,
   Home,
+  UploadCloud,
+  FolderPlus,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePortal } from "@/providers/PortalProvider";
@@ -52,50 +56,88 @@ export default function DevicePage() {
   const params = useParams();
   const router = useRouter();
   const { devices, isLoading: portalLoading } = usePortal();
-  const [shareModalOpen, setShareModalOpen] = useState(false);
 
-  // --- File Browser State ---
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null);
   const [currentPath, setCurrentPath] = useState("/");
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const deviceId = params.device_id as string;
   const device = devices?.find((d) => d?.id === deviceId);
 
-  // --- Fetch Files Logic ---
-  useEffect(() => {
+  const fetchFiles = useCallback(async () => {
     if (!device) return;
 
-    const fetchFiles = async () => {
-      setLoadingFiles(true);
-      setFileError(null);
+    setLoadingFiles(true);
+    setFileError(null);
 
-      // Construct URL: https://device-id.strct.org/api/files?path=/folder
-      const deviceUrl = `https://${device.id}.strct.org`;
-      const endpoint = `${deviceUrl}/api/files?path=${encodeURIComponent(
-        currentPath
-      )}`;
+    const deviceUrl = `https://${device.id}.strct.org`;
+    const endpoint = `${deviceUrl}/api/files?path=${encodeURIComponent(
+      currentPath
+    )}`;
 
-      try {
-        const res = await fetch(endpoint);
-        if (!res.ok) throw new Error("Failed to load files");
-        const data = await res.json();
-        // Backend returns { files: [...] }
-        setFiles(data.files || []);
-      } catch (err) {
-        console.error(err);
-        setFileError("Could not connect to device. Is it online?");
-        setFiles([]);
-      } finally {
-        setLoadingFiles(false);
-      }
-    };
-
-    fetchFiles();
+    try {
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error("Failed to load files");
+      const data = await res.json();
+      setFiles(data.files || []);
+    } catch (err) {
+      console.error(err);
+      setFileError("Could not connect to device. Is it online?");
+      setFiles([]);
+    } finally {
+      setLoadingFiles(false);
+    }
   }, [device, currentPath]);
 
-  // --- Navigation Helpers ---
+  useEffect(() => {
+    fetchFiles();
+  }, [fetchFiles]);
+
+  const sortedFiles = useMemo(() => {
+    return [...files].sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === "folder" ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [files]);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !device) return;
+
+    setIsUploading(true);
+    const uploadUrl = `https://${
+      device.id
+    }.strct.org/strct_agent/fs/upload?path=${encodeURIComponent(currentPath)}`;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(uploadUrl, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      fetchFiles(); // Refresh list
+    } catch (err) {
+      alert("Error uploading file. Check connection.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // --- 4. Navigation & Actions ---
   const handleNavigate = (folderName: string) => {
     const newPath =
       currentPath === "/" ? `/${folderName}` : `${currentPath}/${folderName}`;
@@ -103,25 +145,21 @@ export default function DevicePage() {
   };
 
   const handleBreadcrumbClick = (index: number) => {
-    // /data/photos/2024 -> parts ["", "data", "photos", "2024"]
     const parts = currentPath.split("/").filter(Boolean);
     const newPath = "/" + parts.slice(0, index + 1).join("/");
     setCurrentPath(newPath);
   };
 
   const handleDownload = (fileName: string) => {
-    // Direct link to Go FileServer: https://.../files/path/to/file.ext
     const deviceUrl = `https://${device!.id}.strct.org`;
     const cleanPath = currentPath === "/" ? "" : currentPath;
     const downloadUrl = `${deviceUrl}/files${cleanPath}/${fileName}`;
     window.open(downloadUrl, "_blank");
   };
 
-  // --- Icon Helper ---
   const getFileIcon = (name: string, type: string) => {
     if (type === "folder")
       return <Folder className="text-[#ffc233] fill-[#ffc233]/20" size={24} />;
-
     const ext = name.split(".").pop()?.toLowerCase();
     if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || ""))
       return <ImageIcon className="text-purple-500" size={24} />;
@@ -131,10 +169,10 @@ export default function DevicePage() {
       return <Music className="text-pink-500" size={24} />;
     if (["pdf", "doc", "txt"].includes(ext || ""))
       return <FileText className="text-blue-500" size={24} />;
-
     return <File className="text-gray-400" size={24} />;
   };
 
+  // --- Loading / Error States for Page ---
   if (portalLoading || !devices) {
     return (
       <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
@@ -160,11 +198,18 @@ export default function DevicePage() {
     );
   }
 
-  // Generate Breadcrumb parts
   const pathParts = currentPath.split("/").filter(Boolean);
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f]">
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <main className="pt-28 px-6 pb-12 max-w-[1200px] mx-auto min-h-screen">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
@@ -194,30 +239,40 @@ export default function DevicePage() {
                   <h1 className="text-3xl font-bold text-[#1d1d1f]">
                     {device.friendly_name}
                   </h1>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        device.is_online ? "bg-green-500" : "bg-gray-300"
-                      }`}
-                    ></span>
-                    <span className="capitalize">
-                      {device.is_online ? "Online" : "Offline"}
-                    </span>
-                    <span className="text-gray-300">|</span>
-                    <span className="font-mono text-xs opacity-70">
-                      ID: {device.id.substring(0, 12)}...
-                    </span>
-                  </div>
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
+                {/* NEW FOLDER */}
+                <button
+                  onClick={() => setCreateFolderOpen(true)}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-gray-200 text-[#1d1d1f] font-bold hover:bg-gray-50 transition-all hover:scale-105"
+                >
+                  <FolderPlus size={18} /> New Folder
+                </button>
+
+                {/* UPLOAD */}
+                <button
+                  onClick={handleUploadClick}
+                  disabled={isUploading}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#1d1d1f] hover:bg-black text-white font-bold shadow-lg transition-all hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <UploadCloud size={18} />
+                  )}
+                  {isUploading ? "Uploading..." : "Upload File"}
+                </button>
+
+                {/* SHARE */}
                 <button
                   onClick={() => setShareModalOpen(true)}
                   className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#ffc233] hover:bg-[#ffcd57] text-[#1d1d1f] font-bold shadow-lg shadow-orange-100 transition-all hover:scale-105"
                 >
                   <Share2 size={18} /> Share Files
                 </button>
+
                 <button className="p-3 rounded-xl bg-gray-50 hover:bg-gray-100 text-[#1d1d1f] transition-colors">
                   <Settings size={20} />
                 </button>
@@ -277,25 +332,42 @@ export default function DevicePage() {
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2 min-h-[300px]">
                   <Folder size={48} className="opacity-20" />
                   <span className="text-sm">This folder is empty</span>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setCreateFolderOpen(true)}
+                      className="text-[#ffc233] font-bold text-sm hover:underline"
+                    >
+                      Create Folder
+                    </button>
+                    <span className="text-gray-300">or</span>
+                    <button
+                      onClick={handleUploadClick}
+                      className="text-[#ffc233] font-bold text-sm hover:underline"
+                    >
+                      Upload File
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {files.map((file, idx) => (
+                  {sortedFiles.map((file, idx) => (
                     <motion.div
-                      key={idx}
+                      key={`${file.name}-${idx}`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.03 }}
-                      onClick={() => {
-                        if (file.type === "folder") {
-                          handleNavigate(file.name);
-                        } else {
-                          handleDownload(file.name);
-                        }
-                      }}
-                      className="group p-4 rounded-2xl border border-gray-100 hover:border-[#ffc233] hover:bg-[#fffcf0] hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
+                      // Remove the onClick from the parent div so clicking buttons doesn't trigger navigation
+                      className="group p-4 rounded-2xl border border-gray-100 hover:border-[#ffc233] hover:bg-[#fffcf0] hover:shadow-md transition-all flex items-center justify-between relative"
                     >
-                      <div className="flex items-center gap-3 overflow-hidden">
+                      {/* Clickable Area for Navigation/Download */}
+                      <div
+                        className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer"
+                        onClick={() =>
+                          file.type === "folder"
+                            ? handleNavigate(file.name)
+                            : handleDownload(file.name)
+                        }
+                      >
                         <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-white flex items-center justify-center flex-shrink-0 transition-colors">
                           {getFileIcon(file.name, file.type)}
                         </div>
@@ -313,16 +385,43 @@ export default function DevicePage() {
                         </div>
                       </div>
 
-                      {file.type === "file" && (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-gray-300 opacity-0 group-hover:opacity-100 hover:bg-[#ffc233] hover:text-black transition-all">
-                          <Download size={16} />
-                        </div>
-                      )}
-                      {file.type === "folder" && (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-gray-300 opacity-0 group-hover:opacity-100 transition-all">
-                          <ChevronRight size={16} />
-                        </div>
-                      )}
+                      {/* Action Buttons (Hidden until hover) */}
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                        {/* Delete Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent opening the folder
+                            setItemToDelete(file);
+                            setDeleteModalOpen(true);
+                          }}
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+
+                        {/* Existing Action Button (Download or Enter) */}
+                        {file.type === "file" ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(file.name);
+                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-[#ffc233] hover:text-black transition-colors"
+                          >
+                            <Download size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNavigate(file.name);
+                            }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-[#ffc233] hover:text-black transition-colors"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                        )}
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -337,6 +436,34 @@ export default function DevicePage() {
                 deviceName={device.friendly_name}
               />
             )}
+            {createFolderOpen && device && (
+              <CreateFolderModal
+                onClose={() => setCreateFolderOpen(false)}
+                currentPath={currentPath}
+                deviceId={device.id}
+                onSuccess={() => {
+                  setCreateFolderOpen(false);
+                  fetchFiles();
+                }}
+              />
+            )}
+
+            {deleteModalOpen && itemToDelete && device && (
+              <DeleteModal
+                onClose={() => {
+                  setDeleteModalOpen(false);
+                  setItemToDelete(null);
+                }}
+                item={itemToDelete}
+                currentPath={currentPath}
+                deviceId={device.id}
+                onSuccess={() => {
+                  setDeleteModalOpen(false);
+                  setItemToDelete(null);
+                  fetchFiles();
+                }}
+              />
+            )}
           </AnimatePresence>
         </motion.div>
       </main>
@@ -344,7 +471,200 @@ export default function DevicePage() {
   );
 }
 
-// --- KEEPING THE SHARE MODAL AS IS ---
+// --- NEW COMPONENT: Delete Modal ---
+function DeleteModal({
+  onClose,
+  item,
+  currentPath,
+  deviceId,
+  onSuccess,
+}: {
+  onClose: () => void;
+  item: FileItem;
+  currentPath: string;
+  deviceId: string;
+  onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      // Construct full path: /current/path/filename
+      const fullPath =
+        currentPath === "/" ? `/${item.name}` : `${currentPath}/${item.name}`;
+
+      const res = await fetch(
+        `https://${deviceId}.strct.org/api/delete?path=${encodeURIComponent(
+          fullPath
+        )}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to delete");
+      onSuccess();
+    } catch (err) {
+      alert("Error deleting file");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center"
+      >
+        <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Trash2 size={32} />
+        </div>
+
+        <h3 className="text-xl font-bold text-gray-900">
+          Delete {item.type === "folder" ? "Folder" : "File"}?
+        </h3>
+
+        <p className="text-gray-500 mt-2 text-sm">
+          Are you sure you want to delete{" "}
+          <span className="font-bold text-gray-800">"{item.name}"</span>?
+          {item.type === "folder" && (
+            <span className="block mt-2 text-red-500 font-medium text-xs bg-red-50 p-2 rounded-lg flex items-center justify-center gap-1">
+              <AlertTriangle size={12} /> This will delete all contents inside.
+            </span>
+          )}
+        </p>
+
+        <div className="flex gap-3 justify-center mt-8">
+          <button
+            onClick={onClose}
+            className="px-6 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="px-6 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            {loading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              "Delete"
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function CreateFolderModal({
+  onClose,
+  currentPath,
+  deviceId,
+  onSuccess,
+}: {
+  onClose: () => void;
+  currentPath: string;
+  deviceId: string;
+  onSuccess: () => void;
+}) {
+  const [folderName, setFolderName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!folderName.trim()) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`https://${deviceId}.strct.org/api/mkdir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: currentPath, name: folderName.trim() }),
+      });
+      if (res.status === 409) throw new Error("Folder already exists");
+      if (!res.ok) throw new Error("Failed to create folder");
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || "Error creating folder");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl"
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold">New Folder</h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-black transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Folder Name"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc233] font-medium"
+            />
+            {error && <p className="text-red-500 text-xs mt-2 ml-1">{error}</p>}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !folderName.trim()}
+              className="px-6 py-2 bg-[#1d1d1f] text-white rounded-lg font-bold hover:bg-black disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              Create
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// --- SUB-COMPONENT: Share Modal ---
 function ShareModal({
   onClose,
   deviceName,
@@ -397,7 +717,6 @@ function ShareModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -445,7 +764,6 @@ function ShareModal({
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
               Suggested Contacts
             </label>
-
             <div className="space-y-2">
               {FRIENDS.filter((f) =>
                 f.name.toLowerCase().includes(searchTerm.toLowerCase())
