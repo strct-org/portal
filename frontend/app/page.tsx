@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import FAQ from "@/components/sections/faq";
-import { MessageSquare} from "lucide-react";
 import { ProductComparison } from "@/components/sections/comparison";
 import { Visulas } from "@/components/sections/visula_images";
 import Why from "@/components/sections/why";

@@ -15,7 +15,7 @@ class ApiService {
     console.log("API initialized with base URL:", this.baseUrl);
   }
 
-  private async makeRequest<T>(
+  public async makeRequest<T>(
     endpoint: string,
     options: RequestInit & { token?: string }
   ): Promise<T> {

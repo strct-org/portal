@@ -130,55 +130,7 @@ export default function PortalPage() {
           )}
         </div>
       </div>
-
-      <Footer />
     </main>
   );
 }
 
-
-function Footer() {
-  return (
-    <footer className="absolute bottom-4 left-0 w-full text-center">
-      <div className="flex flex-wrap justify-center gap-4 px-6 text-[10px] text-white/90 drop-shadow-md sm:text-xs">
-        <span>Copyright © 2026 Synology Inc. All rights reserved.</span>
-        <span className="hidden sm:inline">|</span>
-        <Link href="#" className="hover:underline">
-          Terms and Conditions
-        </Link>
-        <span className="hidden sm:inline">|</span>
-        <Link href="#" className="hover:underline">
-          Privacy Statement
-        </Link>
-        <span className="hidden sm:inline">|</span>
-        <Link href="#" className="hover:underline">
-          Cookie Preference
-        </Link>
-        <span className="hidden sm:inline">|</span>
-        <div className="flex items-center gap-1 cursor-pointer hover:underline">
-          <GlobeIcon className="h-3 w-3" />
-          <span>Login site - Global</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-function GlobeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" x2="22" y1="12" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  );
-}

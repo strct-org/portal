@@ -72,7 +72,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-6 mt-4 pt-6 border-t border-gray-200 text-xs">
-        © 2024 Synology Inc. All rights reserved.
+        © 2026 Strct Inc. All rights reserved.
       </div>
     </footer>
   );

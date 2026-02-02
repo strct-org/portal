@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -9,35 +9,22 @@ import {
   Loader2,
   QrCode,
   X,
+  Server,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { apiService } from "@/api";
 import { usePortal } from "@/providers/PortalProvider";
 import { useAuth } from "@clerk/nextjs";
-import { DeviceParams } from "@/types/api.device";
+import { useAllDevicesLiveStats, DeviceLiveStats } from "@/api.device"; // Import the new hook
 
-const generateStorageStats = (deviceId: string) => {
-  const seed = deviceId
-    .split("")
-    .reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-
-  const totalStorageGB = 1024;
-  const usedStorageGB = (seed * 137) % 950;
-  const percentage = Math.round((usedStorageGB / totalStorageGB) * 100);
-  const availableGB = totalStorageGB - usedStorageGB;
-
-  return {
-    totalStorageGB,
-    usedStorageGB,
-    availableGB,
-    percentage,
-  };
-};
-
-const formatStorage = (gb: number) => {
-  if (gb >= 1024) return `${(gb / 1024).toFixed(1)} TB`;
-  return `${Math.round(gb)} GB`;
+// Helper to format the bytes coming from Go server
+const formatBytes = (bytes: number) => {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
 
 export default function DashboardPage() {
@@ -46,10 +33,10 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f] selection:bg-[#ffc233] selection:text-black">
-      <main className="pt-28 px-6 pb-12 max-w-[1200px] mx-auto min-h-screen">
+      <main className="pt-30 px-4 pb-12 max-w-[1280px] mx-auto min-h-screen">
         <DashboardView
           devices={devices}
-          isLoading={isLoading}
+          isGlobalLoading={isLoading}
           onAddDevice={() => setIsAddModalOpen(true)}
         />
       </main>
@@ -71,13 +58,16 @@ export default function DashboardPage() {
 
 function DashboardView({
   devices,
-  isLoading,
+  isGlobalLoading,
   onAddDevice,
 }: {
   devices: any[];
-  isLoading: boolean;
+  isGlobalLoading: boolean;
   onAddDevice: () => void;
 }) {
+  // 1. Fetch live stats for ALL devices here
+  const { stats, loading: loadingStats } = useAllDevicesLiveStats();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -102,16 +92,31 @@ function DashboardView({
         </button>
       </div>
 
-      {devices && (isLoading || devices.length === 0) ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-gray-400" size={32} />
+      {devices && (isGlobalLoading || devices.length === 0) ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          {isGlobalLoading ? (
+            <Loader2 className="animate-spin text-gray-400" size={32} />
+          ) : (
+            <div className="text-gray-400">
+              No devices found. Add one to get started.
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {devices &&
-            devices.map((device) => (
-              <DeviceCard key={device.id} initialDevice={device} />
-            ))}
+          {devices.map((device) => {
+            // 2. Extract specific stats for this device
+            const deviceStat = stats[device.id];
+
+            return (
+              <DeviceCard
+                key={device.id}
+                device={device}
+                liveStats={deviceStat}
+                isChecking={loadingStats}
+              />
+            );
+          })}
 
           {/* Add New Card */}
           <div
@@ -132,85 +137,40 @@ function DashboardView({
   );
 }
 
-function DeviceCard({ initialDevice }: { initialDevice: any }) {
+function DeviceCard({
+  device,
+  liveStats,
+  isChecking,
+}: {
+  device: any;
+  liveStats?: DeviceLiveStats; // Optional because it might not be loaded yet
+  isChecking: boolean;
+}) {
   const router = useRouter();
-  const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  const [params, setParams] = useState<DeviceParams | null>(null);
-  const [loadingParams, setLoadingParams] = useState(true);
-
-  const storageStats = generateStorageStats(initialDevice.id);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchParams = async () => {
-      // DEBUG 1: Check if function starts
-      console.log(`[${initialDevice.id}] 1. Starting fetchParams...`);
-
-      try {
-        // DEBUG 2: Check Auth State
-        if (!isLoaded || !isSignedIn) {
-          console.log(`[${initialDevice.id}] Auth not ready yet.`);
-          return;
-        }
-
-        const token = await getToken();
-
-        // DEBUG 3: Check Token
-        if (!token) {
-          console.warn(
-            `[${initialDevice.id}] 2. No token retrieved. Aborting.`
-          );
-          return;
-        }
-        console.log(`[${initialDevice.id}] 2. Token retrieved. Calling API...`);
-
-        // DEBUG 4: API Call
-        const data = await apiService.getDevicesParams(token, initialDevice.id);
-        console.log(`[${initialDevice.id}] 3. API Success:`, data);
-
-        if (isMounted) {
-          setParams(data);
-        }
-      } catch (error) {
-        console.error(`[${initialDevice.id}] ERROR:`, error);
-      } finally {
-        if (isMounted) setLoadingParams(false);
-      }
-    };
-
-    if (initialDevice?.id) {
-      fetchParams();
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [initialDevice.id, getToken, isLoaded, isSignedIn]);
-
-  // Priority logic: If API params exist, use them. Otherwise, use initial props.
-  const currentDevice = params || initialDevice;
-
-  // Specific checks
-  const isOnline = params ? params.is_online : initialDevice.is_online;
-  const localIp = params ? params.local_ip : initialDevice.local_ip;
-  const friendlyName = initialDevice.friendly_name || initialDevice.id;
+  // Defaults if stats aren't loaded or device is offline
+  const isOnline = liveStats?.isOnline ?? false;
+  const usedBytes = liveStats?.storageUsed || 0;
+  const totalBytes = liveStats?.storageTotal || 1; // avoid divide by zero
+  const percentage = Math.min(Math.round((usedBytes / totalBytes) * 100), 100);
+  const freeBytes = totalBytes - usedBytes;
 
   const handleDeviceClick = () => {
-    router.push(`/portal/${initialDevice.id}`);
+    // Only allow navigation if online? Or let them go to settings regardless?
+    // Usually, we want to let them click.
+    router.push(`/portal/${device.id}`);
   };
 
   return (
     <div
       onClick={handleDeviceClick}
       className={`group relative bg-white rounded-[2rem] p-6 shadow-[0_20px_40px_rgba(0,0,0,0.04)] border border-white/50 hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)] transition-all duration-500 cursor-pointer overflow-hidden ${
-        !isOnline ? "grayscale opacity-80" : ""
+        !isOnline && !isChecking ? "grayscale opacity-80" : ""
       }`}
     >
       {/* Status Badge */}
       <div className="absolute top-6 right-6 flex items-center gap-2">
-        {loadingParams ? (
+        {isChecking && !liveStats ? (
           <Loader2 size={12} className="animate-spin text-gray-400" />
         ) : (
           <span
@@ -220,20 +180,26 @@ function DeviceCard({ initialDevice }: { initialDevice: any }) {
           ></span>
         )}
         <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-          {isOnline ? "Online" : "Offline"}
+          {isChecking && !liveStats
+            ? "Connecting..."
+            : isOnline
+            ? "Online"
+            : "Offline"}
         </span>
       </div>
 
       {/* Icon */}
       <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-        <HardDrive size={32} className="text-[#1d1d1f]" />
+        <Server size={32} className="text-[#1d1d1f]" />
       </div>
 
       {/* Title & IP */}
-      <h3 className="text-xl font-bold text-[#1d1d1f] mb-1">{friendlyName}</h3>
+      <h3 className="text-xl font-bold text-[#1d1d1f] mb-1">
+        {device.friendly_name || device.id}
+      </h3>
       <p className="text-sm text-gray-500 mb-8 font-mono h-5 flex items-center">
         {isOnline ? (
-          localIp || "Negotiating IP..."
+          liveStats?.ipAddress || "Connected via Relay"
         ) : (
           <span className="flex items-center gap-1">Unreachable</span>
         )}
@@ -244,8 +210,9 @@ function DeviceCard({ initialDevice }: { initialDevice: any }) {
         <div className="flex justify-between text-xs font-medium">
           <span className="text-gray-600">Storage Used</span>
           <span className="text-[#1d1d1f]">
-            {formatStorage(storageStats.usedStorageGB)} /{" "}
-            {formatStorage(storageStats.totalStorageGB)}
+            {isOnline
+              ? `${formatBytes(usedBytes)} / ${formatBytes(totalBytes)}`
+              : "-- / --"}
           </span>
         </div>
 
@@ -254,14 +221,14 @@ function DeviceCard({ initialDevice }: { initialDevice: any }) {
           {/* Actual Progress Bar */}
           <div
             className={`h-full rounded-full transition-all duration-1000 ease-out ${
-              storageStats.percentage > 90 ? "bg-red-500" : "bg-[#ffc233]"
+              percentage > 90 ? "bg-red-500" : "bg-[#ffc233]"
             }`}
-            style={{ width: `${storageStats.percentage}%` }}
+            style={{ width: isOnline ? `${percentage}%` : "0%" }}
           />
         </div>
 
         <div className="text-right text-[10px] text-gray-400 font-medium">
-          {formatStorage(storageStats.availableGB)} Free
+          {isOnline ? `${formatBytes(freeBytes)} Free` : "Unknown"}
         </div>
       </div>
 
@@ -307,7 +274,6 @@ function AddDeviceModal({
       );
 
       console.log(newDevice);
-
       onSuccess(newDevice);
     } catch (err: any) {
       setStep("error");
