@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   description: "Create your own personal cloud with BeeStation.",
 };
 
+
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,9 +28,7 @@ export default function RootLayout({
       <html lang="en">
         <body className={inter.className}>
           <PortalProvider>
-            <Header />
             {children}
-            <Footer />
           </PortalProvider>
         </body>
       </html>
