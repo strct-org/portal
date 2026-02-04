@@ -16,9 +16,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiService } from "@/api";
 import { usePortal } from "@/providers/PortalProvider";
 import { useAuth } from "@clerk/nextjs";
-import { useAllDevicesLiveStats, DeviceLiveStats } from "@/api.device"; // Import the new hook
+import { useAllDevicesLiveStats, DeviceLiveStats } from "@/api.device";
 
-// Helper to format the bytes coming from Go server
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return "0 B";
   const k = 1024;

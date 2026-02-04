@@ -77,7 +77,7 @@ export default function DeviceHub() {
       description: "Configure hotspot settings and network credentials.",
       icon: Wifi,
       color: "bg-purple-500",
-      path: `/portal/${deviceId}/wifi`,
+      path: `/portal/${deviceId}/network`,
       status: "active" as const,
     },
     {

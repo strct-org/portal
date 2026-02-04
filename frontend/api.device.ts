@@ -5,8 +5,8 @@ import { usePortal } from "@/providers/PortalProvider";
 
 export interface DeviceLiveStats {
   isOnline: boolean;
-  storageUsed: number; 
-  storageTotal: number; 
+  storageUsed: number;
+  storageTotal: number;
   ipAddress?: string;
   uptime?: number;
 }
@@ -18,7 +18,13 @@ export interface FileItem {
   modifiedAt: string;
 }
 
-
+export interface NetworkStats {
+  latency: number | null; // ms
+  loss: number | null; // %
+  isDown: boolean | null; // critical state
+  bandwidth: number | null; // Mbps
+  timestamp: string | null;
+}
 export const useDeviceUrls = () => {
   const { devices } = usePortal();
 
@@ -135,4 +141,55 @@ export const useDeviceFiles = (selectedDeviceId: string | null) => {
   }, [selectedDeviceId, urls]);
 
   return { files, loading, error };
+};
+
+export const useDeviceNetworkStats = (selectedDeviceId: string | null) => {
+  const urls = useDeviceUrls();
+  const [stats, setStats] = useState<NetworkStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    if (!selectedDeviceId) return;
+
+    setLoading(true);
+    setError(null);
+    const url = urls[selectedDeviceId];
+
+    try {
+      console.log("[NetworkStats] Fetching data...");
+
+      const res = await fetch(`${url}/api/network/now`, {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch network metrics");
+
+      const data = await res.json();
+      console.log("[NetworkStats] Fetched data:", data);
+
+      setStats({
+        latency: data.latency,
+        loss: data.loss,
+        isDown: data.is_down,
+        bandwidth: data.bandwidth,
+        timestamp: data.timestamp,
+      });
+    } catch (err) {
+      console.error("[NetworkStats]", err);
+      setError("Could not retrieve network health");
+      setStats(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDeviceId, urls]);
+
+  useEffect(() => {
+    fetchStats();
+
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
+
+  return { stats, loading, error, refetch: fetchStats };
 };

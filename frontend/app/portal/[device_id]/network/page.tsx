@@ -26,6 +26,7 @@ import {
 } from "recharts";
 import { usePortal } from "@/providers/PortalProvider";
 import { formatDistanceToNow } from "date-fns";
+import { useDeviceNetworkStats } from "@/api.device";
 
 // --- Types based on your Go struct ---
 interface MonitorStats {
@@ -50,6 +51,13 @@ export default function NetworkMonitor() {
 
   const deviceId = params.device_id as string;
   const device = devices?.find((d) => d?.id === deviceId);
+  const {
+    stats,
+    loading: loadingStats,
+    error,
+    refetch,
+  } = useDeviceNetworkStats(deviceId);
+  console.log("Network stats hook data:", { stats, loadingStats, error });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRunningTest, setIsRunningTest] = useState(false);
@@ -377,7 +385,7 @@ export default function NetworkMonitor() {
                       `${value.toFixed(1)} ms`,
                       "Latency",
                     ]}
-                    labelFormatter={(label ) =>
+                    labelFormatter={(label) =>
                       new Date(label).toLocaleTimeString()
                     }
                   />
