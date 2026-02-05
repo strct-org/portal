@@ -136,6 +136,7 @@ func main() {
 	protected.HandleFunc("/device/claim", deviceHandler.ClaimDevice).Methods("POST")
 	protected.HandleFunc("/device/params/{device_id}", deviceHandler.GetParams).Methods("GET")
 	protected.HandleFunc("/device/agent/params/{device_id}", deviceHandler.UpdateParams).Methods("PUT") //req comes from device agent
+	protected.HandleFunc("/device/agent/{device_id}/network_metrics", deviceHandler.SaveNetworkMetrics).Methods("POST") 
 
 	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")

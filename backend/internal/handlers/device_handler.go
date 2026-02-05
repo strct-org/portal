@@ -113,3 +113,28 @@ func (h *DeviceHandler) UpdateParams(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondWithJSON(w, http.StatusOK, params)
 }
+
+
+func (h *DeviceHandler) SaveNetworkMetrics(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	var req device.ParamsUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("UpdateParams Handler: Failed to decode request body: %v", err)
+		utils.RespondWithJSON(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	vars := mux.Vars(r)
+	deviceId := vars["device_id"]
+
+	params, err := h.deviceService.SaveNetworkMetrics(ctx, req, deviceId)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusNotFound, "Failed to update device params")
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, params)
+}
+
