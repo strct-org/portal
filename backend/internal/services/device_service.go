@@ -212,3 +212,18 @@ func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdat
 
 	return &p, nil
 }
+
+
+
+
+
+// UpdateParams updates a device's parameters and returns the updated parameters.
+// If the device is not found, an error with the message "device not found" is returned.
+func (s *DeviceService) SaveNetworkMetrics(ctx context.Context, req device.ParamsUpdate, deviceID string) (*device.Params, error) {
+	
+	p := device.Params{
+		
+	}
+	return &p, nil
+}
+
