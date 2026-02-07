@@ -11,7 +11,8 @@ class ApiService {
       console.warn("NEXT_PUBLIC_API_URL not set, using localhost");
     }
 
-    this.baseUrl = apiUrl || "http://localhost:3000";
+    this.baseUrl = apiUrl || "dev.api.strct.org";
+    
     console.log("API initialized with base URL:", this.baseUrl);
   }
 
