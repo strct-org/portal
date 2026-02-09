@@ -65,8 +65,12 @@ func main() {
 		dbPool.Close()
 	}()
 
+	metricsBatcher := services.NewMetricsBatcher(dbPool)
+	go metricsBatcher.Start() // Start the background worker
+	defer metricsBatcher.Stop()
+
 	userService = services.NewUserService(dbPool)
-	deviceService = services.NewDeviceService(dbPool)
+	deviceService = services.NewDeviceService(dbPool, metricsBatcher)
 
 	userHandler := handlers.NewUserHandler(userService)
 	deviceHandler := handlers.NewDeviceHandler(deviceService)
@@ -115,6 +119,7 @@ func main() {
 	standardRouter.PathPrefix("/agent_updates/").Handler(http.StripPrefix("/agent_updates/", updatesFS)).Methods("GET")
 
 	standardRouter.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
+	standardRouter.HandleFunc("/device/agent/{device_id}/network_metrics", deviceHandler.SaveNetworkMetrics).Methods("POST") //! ISN'S safe 
 
 	api := standardRouter.PathPrefix("/api/v1").Subrouter()
 
@@ -136,7 +141,7 @@ func main() {
 	protected.HandleFunc("/device/claim", deviceHandler.ClaimDevice).Methods("POST")
 	protected.HandleFunc("/device/params/{device_id}", deviceHandler.GetParams).Methods("GET")
 	protected.HandleFunc("/device/agent/params/{device_id}", deviceHandler.UpdateParams).Methods("PUT") //req comes from device agent
-	protected.HandleFunc("/device/agent/{device_id}/network_metrics", deviceHandler.SaveNetworkMetrics).Methods("POST") 
+	protected.HandleFunc("/device/{device_id}/network_stats", deviceHandler.GetNetworkStats).Methods("GET")
 
 	// protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 	// protected.HandleFunc("/user", userHandler.DeleteAccount).Methods("DELETE")

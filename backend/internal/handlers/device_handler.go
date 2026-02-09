@@ -90,6 +90,29 @@ func (h *DeviceHandler) GetParams(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondWithJSON(w, http.StatusOK, params)
 }
+func (h *DeviceHandler) GetNetworkStats(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	clerkID, ok := middleware.GetClerkID(ctx)
+	if !ok {
+		utils.RespondWithError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	vars := mux.Vars(r)
+	deviceId := vars["device_id"]
+
+	params, err := h.deviceService.GetNetworkStats(ctx, clerkID, deviceId)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusNotFound, "Failed to get device network stats")
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, params)
+}
+
+
 
 func (h *DeviceHandler) UpdateParams(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -113,28 +136,24 @@ func (h *DeviceHandler) UpdateParams(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondWithJSON(w, http.StatusOK, params)
 }
-
-
 func (h *DeviceHandler) SaveNetworkMetrics(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
-	var req device.ParamsUpdate
+	var req services.AgentMetricRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("UpdateParams Handler: Failed to decode request body: %v", err)
-		utils.RespondWithJSON(w, http.StatusBadRequest, "Invalid request body")
+		log.Printf("Metrics Decode Error: %v", err)
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	vars := mux.Vars(r)
 	deviceId := vars["device_id"]
 
-	params, err := h.deviceService.SaveNetworkMetrics(ctx, req, deviceId)
+	err := h.deviceService.SaveNetworkMetrics(r.Context(), req, deviceId)
 	if err != nil {
-		utils.RespondWithError(w, http.StatusNotFound, "Failed to update device params")
+		http.Error(w, "Error processing metrics", http.StatusInternalServerError)
 		return
 	}
 
-	utils.RespondWithJSON(w, http.StatusOK, params)
+	w.WriteHeader(http.StatusAccepted) 
+	json.NewEncoder(w).Encode(map[string]string{"status": "queued"})
 }
 

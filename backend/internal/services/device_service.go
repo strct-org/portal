@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,12 +14,14 @@ import (
 )
 
 type DeviceService struct {
-	db *pgxpool.Pool
+	db      *pgxpool.Pool
+	batcher *MetricsBatcher
 }
 
-func NewDeviceService(db *pgxpool.Pool) *DeviceService {
+func NewDeviceService(db *pgxpool.Pool, batcher *MetricsBatcher) *DeviceService {
 	return &DeviceService{
-		db: db,
+		db:      db,
+		batcher: batcher,
 	}
 }
 
@@ -179,6 +182,37 @@ func (s *DeviceService) GetParams(ctx context.Context, clerkID string, deviceID 
 	return &p, nil
 }
 
+// ! db call to tget all device stats
+func (s *DeviceService) GetNetworkStats(ctx context.Context, clerkID string, deviceID string) (*device.Params, error) {
+	user, err := utils.GetUserByClerkID(ctx, s.db, clerkID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to identify user: %w", err)
+	}
+
+	query := `
+		SELECT is_online, last_seen, local_ip, version, updated_at
+		FROM devices
+		WHERE id = $1 AND owner_id = $2
+	`
+
+	var p device.Params
+	err = s.db.QueryRow(ctx, query, deviceID, user.ID).Scan(
+		&p.IsOnline,
+		&p.LastSeen,
+		&p.LocalIP,
+		&p.Version,
+		&p.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("device not found or access denied")
+		}
+		return nil, fmt.Errorf("failed to scan device params: %w", err)
+	}
+
+	return &p, nil
+}
 
 func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdate, deviceID string) (*device.Params, error) {
 	query := `
@@ -213,17 +247,27 @@ func (s *DeviceService) UpdateParams(ctx context.Context, req device.ParamsUpdat
 	return &p, nil
 }
 
-
-
-
-
-// UpdateParams updates a device's parameters and returns the updated parameters.
-// If the device is not found, an error with the message "device not found" is returned.
-func (s *DeviceService) SaveNetworkMetrics(ctx context.Context, req device.ParamsUpdate, deviceID string) (*device.Params, error) {
-	
-	p := device.Params{
-		
-	}
-	return &p, nil
+type AgentMetricRequest struct {
+	Latency   *float64  `json:"latency,omitempty"`
+	Loss      *float64  `json:"loss,omitempty"`
+	Bandwidth *float64  `json:"bandwidth,omitempty"`
+	IsDown    *bool     `json:"is_down,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
+
+func (s *DeviceService) SaveNetworkMetrics(ctx context.Context, req AgentMetricRequest, deviceID string) error {
+	data := MetricData{
+		DeviceID:  deviceID,
+		Latency:   req.Latency,
+		Loss:      req.Loss,
+		Bandwidth: req.Bandwidth,
+		IsDown:    req.IsDown,
+		Timestamp: req.Timestamp,
+	}
+	
+	// Push to buffer (Non-blocking usually)
+	s.batcher.Add(data)
+
+	return nil
+}
