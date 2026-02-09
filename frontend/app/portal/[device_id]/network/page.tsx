@@ -6,8 +6,6 @@ import {
   ArrowLeft,
   Activity,
   Wifi,
-  ArrowDown,
-  ArrowUp,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -28,7 +26,7 @@ import { usePortal } from "@/providers/PortalProvider";
 import { formatDistanceToNow } from "date-fns";
 import { useDeviceNetworkStats } from "@/api.device";
 
-// --- Types based on your Go struct ---
+// --- Types ---
 interface MonitorStats {
   latency: number | null; // ms
   loss: number | null; // %
@@ -37,11 +35,15 @@ interface MonitorStats {
   timestamp: string;
 }
 
-// Mock data to initialize (prevents empty charts before first fetch)
+type ChartType = "latency" | "bandwidth" | "loss";
+
+// Mock data initialized with occasional bandwidth/loss for visualization
 const MOCK_HISTORY = Array.from({ length: 20 }, (_, i) => ({
   timestamp: new Date(Date.now() - (20 - i) * 30000).toISOString(),
   latency: 15 + Math.random() * 10,
-  bandwidth: null,
+  loss: Math.random() > 0.8 ? Math.random() * 2 : 0,
+  // Simulate bandwidth appearing only every 5th point
+  bandwidth: i % 5 === 0 ? 100 + Math.random() * 50 : null,
 }));
 
 export default function NetworkMonitor() {
@@ -51,26 +53,22 @@ export default function NetworkMonitor() {
 
   const deviceId = params.device_id as string;
   const device = devices?.find((d) => d?.id === deviceId);
-  const {
-    stats,
-    loading: loadingStats,
-    error,
-    refetch,
-  } = useDeviceNetworkStats(deviceId);
-  console.log("Network stats hook data:", { stats, loadingStats, error });
+  const { stats } = useDeviceNetworkStats(deviceId);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRunningTest, setIsRunningTest] = useState(false);
+
+  // 1. New State for tracking which chart is active
+  const [activeChart, setActiveChart] = useState<ChartType>("latency");
+
   const [history, setHistory] = useState<MonitorStats[]>([]);
   const [latestStats, setLatestStats] = useState<MonitorStats | null>(null);
 
-  // Derived state for the last known bandwidth (since it updates rarely)
+  // Derived state for the last known bandwidth
   const lastKnownBandwidth = useMemo(() => {
-    // 1. Check latest stats
     if (latestStats?.bandwidth)
       return { val: latestStats.bandwidth, time: latestStats.timestamp };
 
-    // 2. Look back through history
     const found = [...history]
       .reverse()
       .find((h) => h.bandwidth !== null && h.bandwidth !== undefined);
@@ -83,26 +81,24 @@ export default function NetworkMonitor() {
     if (!device) return;
 
     try {
-      // In a real scenario, this endpoint returns { current: {}, history: [] }
-      // The Go code pushes updates; the API should store them in a time-series DB.
       const res = await fetch(
-        `https://${device.id}.strct.org/api/network/stats`
+        `https://${device.id}.strct.org/api/network/stats` //! call to
       );
+      // const res = await apiService.getDeviceNetworkStats(device.id);
 
-      // Fallback for demo purposes if API isn't ready
       if (!res.ok) {
-        // Simulating data arrival
+        // Simulation fallback
         const newPoint = {
           timestamp: new Date().toISOString(),
-          latency: 20 + Math.random() * 15, // random ms
-          loss: Math.random() > 0.95 ? 2.0 : 0, // rare packet loss
+          latency: 20 + Math.random() * 15,
+          loss: Math.random() > 0.95 ? 2.0 : 0,
           is_down: false,
-          bandwidth: Math.random() > 0.9 ? 150 : null, // occasional bandwidth update
+          bandwidth: Math.random() > 0.9 ? 150 : null,
         };
 
         setHistory((prev) => {
           const newHist = [...prev, newPoint];
-          return newHist.slice(-50); // Keep last 50 points
+          return newHist.slice(-50);
         });
         setLatestStats(newPoint);
         return;
@@ -120,35 +116,64 @@ export default function NetworkMonitor() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Poll every 5s
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
   const handleRunSpeedtest = async () => {
     if (!device) return;
     setIsRunningTest(true);
+    // Auto-switch to bandwidth chart so user sees result
+    setActiveChart("bandwidth");
+    console.log(`https://${device.id}.strct.org/api/network/speedtest`);
+
     try {
-      // Trigger the Go function manual override
       await fetch(`https://${device.id}.strct.org/api/network/speedtest`, {
-        method: "POST",
+        method: "GET",
       });
-      // Poll faster for result
-      setTimeout(fetchData, 2000);
-      setTimeout(fetchData, 5000);
     } catch (e) {
       alert("Failed to trigger speedtest");
     } finally {
-      setTimeout(() => setIsRunningTest(false), 10000); // cooldown UI
+      setTimeout(() => setIsRunningTest(false), 10);
     }
   };
 
-  // Helper for status color
   const getLatencyColor = (ms: number | null) => {
     if (!ms) return "text-gray-400";
     if (ms < 50) return "text-green-500";
     if (ms < 150) return "text-yellow-500";
     return "text-red-500";
   };
+
+  // 2. Configuration helper for the dynamic chart
+  const chartConfig = {
+    latency: {
+      title: "Latency History",
+      description: "Response time to 8.8.8.8 over the last hour",
+      dataKey: "latency",
+      color: "#22c55e", // Green
+      unit: "ms",
+      gradientId: "colorLatency",
+    },
+    bandwidth: {
+      title: "Download Speed History",
+      description: "Speedtest results over time",
+      dataKey: "bandwidth",
+      color: "#3b82f6", // Blue
+      unit: "Mbps",
+      gradientId: "colorBandwidth",
+    },
+    loss: {
+      title: "Packet Loss History",
+      description: "Percentage of dropped packets over time",
+      dataKey: "loss",
+      color: "#ef4444", // Red
+      unit: "%",
+      gradientId: "colorLoss",
+    },
+  };
+
+  const currentConfig = chartConfig[activeChart];
 
   if (portalLoading || !device) {
     return (
@@ -211,10 +236,19 @@ export default function NetworkMonitor() {
             </button>
           </div>
 
-          {/* KPI CARDS */}
+          {/* KPI CARDS - Now Clickable Buttons */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Latency Card */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 relative overflow-hidden group">
+            {/* 1. Latency Card */}
+            <button
+              onClick={() => setActiveChart("latency")}
+              className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm relative overflow-hidden group
+                ${
+                  activeChart === "latency"
+                    ? "ring-2 ring-green-500 ring-offset-2"
+                    : "border border-gray-100 hover:border-green-200 hover:shadow-md"
+                }
+              `}
+            >
               <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
                   <Activity size={24} />
@@ -240,9 +274,8 @@ export default function NetworkMonitor() {
                   </span>
                 </div>
               </div>
-              {/* Background Chart Effect */}
+              {/* Decorative mini chart background */}
               <div className="absolute bottom-0 left-0 right-0 h-16 opacity-10 group-hover:opacity-20 transition-opacity">
-                {/* Decorative mini chart */}
                 <svg
                   viewBox="0 0 100 20"
                   className="w-full h-full fill-green-500"
@@ -250,10 +283,19 @@ export default function NetworkMonitor() {
                   <path d="M0,20 L0,10 C10,12 20,5 30,10 C40,15 50,8 60,12 C70,16 80,10 90,14 L100,10 L100,20 Z" />
                 </svg>
               </div>
-            </div>
+            </button>
 
-            {/* Bandwidth Card */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            {/* 2. Bandwidth Card */}
+            <button
+              onClick={() => setActiveChart("bandwidth")}
+              className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm
+                ${
+                  activeChart === "bandwidth"
+                    ? "ring-2 ring-blue-500 ring-offset-2"
+                    : "border border-gray-100 hover:border-blue-200 hover:shadow-md"
+                }
+              `}
+            >
               <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
                   <Wifi size={24} />
@@ -276,10 +318,19 @@ export default function NetworkMonitor() {
                   </span>
                 </div>
               </div>
-            </div>
+            </button>
 
-            {/* Packet Loss / Health Card */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            {/* 3. Packet Loss Card */}
+            <button
+              onClick={() => setActiveChart("loss")}
+              className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm
+                ${
+                  activeChart === "loss"
+                    ? "ring-2 ring-red-500 ring-offset-2"
+                    : "border border-gray-100 hover:border-red-200 hover:shadow-md"
+                }
+              `}
+            >
               <div className="flex justify-between items-start mb-4">
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
@@ -309,25 +360,41 @@ export default function NetworkMonitor() {
                   </span>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
 
-          {/* MAIN CHART SECTION */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
+          {/* MAIN DYNAMIC CHART SECTION */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 transition-colors duration-300">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h3 className="text-xl font-bold text-[#1d1d1f]">
-                  Latency History
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Response time to 8.8.8.8 over the last hour
-                </p>
+                <motion.h3
+                  key={currentConfig.title}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="text-xl font-bold text-[#1d1d1f]"
+                >
+                  {currentConfig.title}
+                </motion.h3>
+                <motion.p
+                  key={currentConfig.description}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-sm text-gray-500"
+                >
+                  {currentConfig.description}
+                </motion.p>
               </div>
+
               {/* Legend */}
               <div className="flex items-center gap-4 text-xs font-bold text-gray-500">
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-400"></span>{" "}
-                  Latency (ms)
+                  <span
+                    className="w-3 h-3 rounded-full transition-colors duration-300"
+                    style={{ backgroundColor: currentConfig.color }}
+                  ></span>
+                  {currentConfig.dataKey === "latency" && "Latency (ms)"}
+                  {currentConfig.dataKey === "bandwidth" && "Speed (Mbps)"}
+                  {currentConfig.dataKey === "loss" && "Loss (%)"}
                 </div>
               </div>
             </div>
@@ -346,12 +413,28 @@ export default function NetworkMonitor() {
                       <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                     </linearGradient>
+                    <linearGradient
+                      id="colorBandwidth"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorLoss" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
                   </defs>
+
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
                     stroke="#f0f0f0"
                   />
+
                   <XAxis
                     dataKey="timestamp"
                     tickFormatter={(str: string) =>
@@ -366,13 +449,15 @@ export default function NetworkMonitor() {
                     axisLine={false}
                     minTickGap={30}
                   />
+
                   <YAxis
                     stroke="#9ca3af"
                     tick={{ fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
-                    unit=" ms"
+                    unit={` ${currentConfig.unit}`}
                   />
+
                   <Tooltip
                     contentStyle={{
                       borderRadius: "16px",
@@ -382,21 +467,24 @@ export default function NetworkMonitor() {
                     labelStyle={{ color: "#6b7280", marginBottom: "0.5rem" }}
                     itemStyle={{ fontWeight: "bold", color: "#1d1d1f" }}
                     formatter={(value: any) => [
-                      `${value.toFixed(1)} ms`,
-                      "Latency",
+                      `${Number(value).toFixed(1)} ${currentConfig.unit}`,
+                      currentConfig.title.split(" ")[0], // Simpler label in tooltip
                     ]}
                     labelFormatter={(label) =>
                       new Date(label).toLocaleTimeString()
                     }
                   />
+
                   <Area
+                    key={activeChart}
                     type="monotone"
-                    dataKey="latency"
-                    stroke="#22c55e"
+                    dataKey={currentConfig.dataKey}
+                    stroke={currentConfig.color}
                     strokeWidth={3}
                     fillOpacity={1}
-                    fill="url(#colorLatency)"
-                    isAnimationActive={false} // Disable animation for real-time updates to prevent jitter
+                    fill={`url(#${currentConfig.gradientId})`}
+                    isAnimationActive={true}
+                    connectNulls={true}
                   />
                 </AreaChart>
               </ResponsiveContainer>

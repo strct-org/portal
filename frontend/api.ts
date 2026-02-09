@@ -12,7 +12,7 @@ class ApiService {
     }
 
     this.baseUrl = apiUrl || "dev.api.strct.org";
-    
+
     console.log("API initialized with base URL:", this.baseUrl);
   }
 
@@ -126,7 +126,10 @@ class ApiService {
     });
   }
 
-  async getDevicesParams(token: string, deviceId: string): Promise<DeviceParams> {
+  async getDevicesParams(
+    token: string,
+    deviceId: string
+  ): Promise<DeviceParams> {
     return this.makeRequest<DeviceParams>(`/api/v1/device/params/${deviceId}`, {
       method: "GET",
       token,
@@ -145,6 +148,16 @@ class ApiService {
       method: "POST",
       token,
       body: JSON.stringify(args),
+    });
+  }
+
+  async getDeviceNetworkStats(
+    token: string,
+    deviceId: string
+  ): Promise<DeviceParams> {
+    return this.makeRequest<DeviceParams>(`/api/v1/device/${deviceId}network_stats`, {
+      method: "GET",
+      token,
     });
   }
 }

@@ -157,7 +157,9 @@ export const useDeviceNetworkStats = (selectedDeviceId: string | null) => {
     const url = urls[selectedDeviceId];
 
     try {
-      console.log("[NetworkStats] Fetching data...");
+      console.log("[NetworkStats] Fetching data...");`${url}/api/network/now`;
+      console.log(`${url}/api/network/now`);
+     
 
       const res = await fetch(`${url}/api/network/now`, {
         signal: AbortSignal.timeout(5000),
