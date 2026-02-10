@@ -121,6 +121,7 @@ func main() {
 	standardRouter.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
 
 	api := standardRouter.PathPrefix("/api/v1").Subrouter()
+	
 	api.HandleFunc("/device/agent/{device_id}/network_metrics", deviceHandler.SaveNetworkMetrics).Methods("POST") //! no auth middleware
 
 	// api.HandleFunc("/privacy-policy", docHandler.ServePrivacyPolicy).Methods("GET")

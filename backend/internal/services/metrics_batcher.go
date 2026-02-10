@@ -39,19 +39,16 @@ func NewMetricsBatcher(db *pgxpool.Pool) *MetricsBatcher {
 	}
 }
 
-// Add queues a metric to be saved
 func (mb *MetricsBatcher) Add(data MetricData) {
 	select {
 	case mb.inputChan <- data:
-		// Queued successfully
 	default:
 		log.Println("WARNING: Metrics buffer full, dropping data packet")
 	}
 }
 
-// Start runs the background worker
 func (mb *MetricsBatcher) Start() {
-	ticker := time.NewTicker(10 * time.Second) // Flush every 10s regardless of size
+	ticker := time.NewTicker(1 * time.Hour) // Flush every 1 hoour regardless of size
 	defer ticker.Stop()
 
 	for {
