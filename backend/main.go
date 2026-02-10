@@ -119,9 +119,9 @@ func main() {
 	standardRouter.PathPrefix("/agent_updates/").Handler(http.StripPrefix("/agent_updates/", updatesFS)).Methods("GET")
 
 	standardRouter.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
-	standardRouter.HandleFunc("/device/agent/{device_id}/network_metrics", deviceHandler.SaveNetworkMetrics).Methods("POST") //! ISN'S safe 
 
 	api := standardRouter.PathPrefix("/api/v1").Subrouter()
+	api.HandleFunc("/device/agent/{device_id}/network_metrics", deviceHandler.SaveNetworkMetrics).Methods("POST") //! no auth middleware
 
 	// api.HandleFunc("/privacy-policy", docHandler.ServePrivacyPolicy).Methods("GET")
 	// api.HandleFunc("/terms-of-services", docHandler.ServeTermsOfServices).Methods("GET")
