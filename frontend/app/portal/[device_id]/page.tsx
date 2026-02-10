@@ -10,11 +10,12 @@ import {
   Activity,
   ChevronRight,
   Server,
-  Lock,
   Wifi,
+  X,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePortal } from "@/providers/PortalProvider";
+import { useState } from "react";
 
 interface FeatureCardProps {
   title: string;
@@ -29,6 +30,8 @@ export default function DeviceHub() {
   const params = useParams();
   const router = useRouter();
   const { devices, isLoading } = usePortal();
+
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   const deviceId = params.device_id as string;
   const device = devices?.find((d) => d?.id === deviceId);
@@ -51,7 +54,7 @@ export default function DeviceHub() {
       icon: Globe,
       color: "bg-blue-500",
       path: `/portal/${deviceId}/vpn`,
-      status: "active" as const,
+      status: "inactive" as const,
     },
     {
       id: "adblock",
@@ -60,7 +63,8 @@ export default function DeviceHub() {
       icon: Shield,
       color: "bg-red-500",
       path: `/portal/${deviceId}/adblock`,
-      status: "beta" as const,
+      status: "inactive" as const,
+      // status: "beta" as const,
     },
     {
       id: "monitor",
@@ -78,7 +82,7 @@ export default function DeviceHub() {
       icon: Wifi,
       color: "bg-purple-500",
       path: `/portal/${deviceId}/network`,
-      status: "active" as const,
+      status: "inactive" as const,
     },
     {
       id: "web",
@@ -138,10 +142,10 @@ export default function DeviceHub() {
             </div>
 
             <button
-              onClick={() => router.push(`/portal/${deviceId}/settings`)}
+              onClick={() => setSettingsModalOpen(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-full font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
             >
-              <Settings size={18} /> Settings
+              Settings
             </button>
           </div>
           <button
@@ -167,11 +171,126 @@ export default function DeviceHub() {
               />
             ))}
           </div>
+
+          {settingsModalOpen && device && (
+            <SettingsModal
+              onClose={() => setSettingsModalOpen(false)}
+              deviceName={device.friendly_name}
+              deviceId={device.id}
+            />
+          )}
         </motion.div>
       </main>
     </div>
   );
 }
+
+
+function SettingsModal({
+  onClose,
+  deviceName,
+  deviceId,
+}: {
+  onClose: () => void;
+  deviceName: string;
+  deviceId: string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="relative bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl"
+      >
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-[#1d1d1f]">
+              Device Settings
+            </h3>
+            <p className="text-sm text-gray-500">
+              Manage preferences for {deviceName}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-black hover:bg-gray-100 transition-all"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+              Device ID
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="font-mono text-sm text-gray-800">
+                {deviceId}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl border border-gray-100">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              Visibility
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-gray-900 text-sm">
+                  Allow file sharing
+                </div>
+                <div className="text-xs text-gray-500">
+                  Let invited users access files
+                </div>
+              </div>
+              <div className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                Enabled
+              </div>
+            </div>
+          </div>
+
+          
+
+          <div className="p-4 rounded-2xl border border-gray-100">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              Actions
+            </div>
+            <div className="flex gap-2">
+              <button className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
+                Rename Device
+              </button>
+              <button className="flex-1 px-4 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">
+                Remove Device
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-8">
+          <button
+            onClick={onClose}
+            className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+          >
+            Close
+          </button>
+          <button className="px-6 py-3 rounded-xl font-bold bg-[#1d1d1f] text-white hover:bg-black transition-colors">
+            Save Changes
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 
 function FeatureCard({
   title,

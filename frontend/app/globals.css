@@ -14,16 +14,27 @@
   --foreground: #1d1d1f;
 }
 
+/* 1. Target both HTML and BODY */
+html,
 body {
-    scroll-behavior: smooth;
+  scroll-behavior: smooth;
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE and Edge */
+  -ms-overflow-style: none;
+}
+
+/* 2. Target Webkit (Chrome, Safari) specifically on HTML and BODY */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+body {
   background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-html {
-  scroll-behavior: smooth;
 }

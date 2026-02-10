@@ -11,6 +11,9 @@ import {
   Clock,
   RefreshCw,
   Server,
+  Download,
+  Calendar,
+  FileText,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -23,8 +26,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { usePortal } from "@/providers/PortalProvider";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, subDays, subHours, format } from "date-fns";
 import { useDeviceNetworkStats } from "@/api.device";
+// Import PDF libraries
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // --- Types ---
 interface MonitorStats {
@@ -36,13 +42,13 @@ interface MonitorStats {
 }
 
 type ChartType = "latency" | "bandwidth" | "loss";
+type TimeRange = "24h" | "7d" | "30d" | "custom";
 
-// Mock data initialized with occasional bandwidth/loss for visualization
+// Mock data initialized for visualization
 const MOCK_HISTORY = Array.from({ length: 20 }, (_, i) => ({
   timestamp: new Date(Date.now() - (20 - i) * 30000).toISOString(),
   latency: 15 + Math.random() * 10,
   loss: Math.random() > 0.8 ? Math.random() * 2 : 0,
-  // Simulate bandwidth appearing only every 5th point
   bandwidth: i % 5 === 0 ? 100 + Math.random() * 50 : null,
 }));
 
@@ -57,9 +63,12 @@ export default function NetworkMonitor() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRunningTest, setIsRunningTest] = useState(false);
-
-  // 1. New State for tracking which chart is active
   const [activeChart, setActiveChart] = useState<ChartType>("latency");
+
+  // --- Export State ---
+  const [exportRange, setExportRange] = useState<TimeRange>("24h");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [isExporting, setIsExporting] = useState<ChartType | null>(null);
 
   const [history, setHistory] = useState<MonitorStats[]>([]);
   const [latestStats, setLatestStats] = useState<MonitorStats | null>(null);
@@ -77,17 +86,18 @@ export default function NetworkMonitor() {
       : { val: 0, time: new Date().toISOString() };
   }, [latestStats, history]);
 
+  // --- Data Fetching (Live) ---
   const fetchData = useCallback(async () => {
     if (!device) return;
 
     try {
+      // Replace with your actual API call
       const res = await fetch(
-        `https://${device.id}.strct.org/api/network/stats` //! call to
+        `https://${device.id}.strct.org/api/network/stats`
       );
-      // const res = await apiService.getDeviceNetworkStats(device.id);
 
       if (!res.ok) {
-        // Simulation fallback
+        // Simulation fallback for live data
         const newPoint = {
           timestamp: new Date().toISOString(),
           latency: 20 + Math.random() * 15,
@@ -123,9 +133,7 @@ export default function NetworkMonitor() {
   const handleRunSpeedtest = async () => {
     if (!device) return;
     setIsRunningTest(true);
-    // Auto-switch to bandwidth chart so user sees result
     setActiveChart("bandwidth");
-    console.log(`https://${device.id}.strct.org/api/network/speedtest`);
 
     try {
       await fetch(`https://${device.id}.strct.org/api/network/speedtest`, {
@@ -138,6 +146,173 @@ export default function NetworkMonitor() {
     }
   };
 
+  // --- PDF & Historical Data Logic ---
+
+  /**
+   * Simulates fetching historical data from a database.
+   * In a real app, you would pass start/end dates to your API here.
+   */
+  const fetchDetailedHistory = async (
+    range: TimeRange,
+    customStart?: string
+  ) => {
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    let startDate = new Date();
+    let intervalMinutes = 5; // Granularity
+
+    switch (range) {
+      case "24h":
+        startDate = subHours(new Date(), 24);
+        intervalMinutes = 15;
+        break;
+      case "7d":
+        startDate = subDays(new Date(), 7);
+        intervalMinutes = 60; // Hourly for 7 days
+        break;
+      case "30d":
+        startDate = subDays(new Date(), 30);
+        intervalMinutes = 240; // Every 4 hours
+        break;
+      case "custom":
+        startDate = customStart
+          ? new Date(customStart)
+          : subDays(new Date(), 1);
+        intervalMinutes = 60;
+        break;
+    }
+
+    const endDate = new Date();
+    const mockData: MonitorStats[] = [];
+    let current = new Date(startDate);
+
+    // Generate realistic looking data
+    while (current <= endDate) {
+      mockData.push({
+        timestamp: current.toISOString(),
+        latency: 10 + Math.random() * 30 + (Math.random() > 0.9 ? 100 : 0), // Occasional spikes
+        loss: Math.random() > 0.95 ? Math.random() * 5 : 0,
+        is_down: false,
+        // Bandwidth tests usually happen less frequently
+        bandwidth: Math.random() > 0.8 ? 50 + Math.random() * 200 : null,
+      });
+      current = new Date(current.getTime() + intervalMinutes * 60000);
+    }
+
+    return mockData;
+  };
+
+  const generatePDF = async (type: ChartType) => {
+    if (!device) return;
+    setIsExporting(type);
+
+    try {
+      // 1. Get Data
+      const data = await fetchDetailedHistory(exportRange, customStartDate);
+
+      // 2. Filter data for the specific metric
+      const filteredData = data.filter((d) => {
+        if (type === "bandwidth") return d.bandwidth !== null;
+        return true;
+      });
+
+      // 3. Calculate Summary Stats
+      const values = filteredData.map((d) =>
+        type === "latency"
+          ? d.latency || 0
+          : type === "bandwidth"
+          ? d.bandwidth || 0
+          : d.loss || 0
+      );
+
+      const avg = values.reduce((a, b) => a + b, 0) / (values.length || 1);
+      const max = Math.max(...values, 0);
+      const min = Math.min(...values, 0);
+
+      // 4. Create PDF
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(18);
+      doc.text("Network Performance Report", 14, 20);
+
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text(`Device: ${device.friendly_name || device.id}`, 14, 30);
+      doc.text(`Generated: ${format(new Date(), "PPpp")}`, 14, 36);
+
+      // Metric Title
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text(
+        `${type.charAt(0).toUpperCase() + type.slice(1)} History (${
+          exportRange === "custom" ? "Custom Range" : "Last " + exportRange
+        })`,
+        14,
+        50
+      );
+
+      // Summary Box
+      const unit =
+        type === "latency" ? "ms" : type === "bandwidth" ? "Mbps" : "%";
+
+      const summaryData = [
+        ["Average", "Maximum", "Minimum", "Samples"],
+        [
+          `${avg.toFixed(2)} ${unit}`,
+          `${max.toFixed(2)} ${unit}`,
+          `${min.toFixed(2)} ${unit}`,
+          values.length.toString(),
+        ],
+      ];
+
+      autoTable(doc, {
+        startY: 55,
+        head: [summaryData[0]],
+        body: [summaryData[1]],
+        theme: "grid",
+        headStyles: { fillColor: [29, 29, 31] },
+      });
+
+      // Detailed Data Table
+      doc.text("Detailed Logs", 14, (doc as any).lastAutoTable.finalY + 15);
+
+      const tableRows = filteredData.map((item) => [
+        format(new Date(item.timestamp), "yyyy-MM-dd HH:mm:ss"),
+        type === "latency"
+          ? `${item.latency?.toFixed(1)} ms`
+          : type === "bandwidth"
+          ? `${item.bandwidth?.toFixed(1)} Mbps`
+          : `${item.loss?.toFixed(2)} %`,
+        item.is_down ? "Offline" : "Online",
+      ]);
+
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 20,
+        head: [["Timestamp", "Value", "Status"]],
+        body: tableRows,
+        theme: "striped",
+        headStyles: {
+          fillColor:
+            type === "loss"
+              ? [239, 68, 68]
+              : type === "bandwidth"
+              ? [59, 130, 246]
+              : [34, 197, 94],
+        },
+      });
+
+      // Save
+      doc.save(`${device.id}_${type}_report.pdf`);
+    } catch (error) {
+      console.error("PDF Generation Error", error);
+      alert("Failed to generate report");
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
   const getLatencyColor = (ms: number | null) => {
     if (!ms) return "text-gray-400";
     if (ms < 50) return "text-green-500";
@@ -145,13 +320,12 @@ export default function NetworkMonitor() {
     return "text-red-500";
   };
 
-  // 2. Configuration helper for the dynamic chart
   const chartConfig = {
     latency: {
       title: "Latency History",
       description: "Response time to 8.8.8.8 over the last hour",
       dataKey: "latency",
-      color: "#22c55e", // Green
+      color: "#22c55e",
       unit: "ms",
       gradientId: "colorLatency",
     },
@@ -159,7 +333,7 @@ export default function NetworkMonitor() {
       title: "Download Speed History",
       description: "Speedtest results over time",
       dataKey: "bandwidth",
-      color: "#3b82f6", // Blue
+      color: "#3b82f6",
       unit: "Mbps",
       gradientId: "colorBandwidth",
     },
@@ -167,7 +341,7 @@ export default function NetworkMonitor() {
       title: "Packet Loss History",
       description: "Percentage of dropped packets over time",
       dataKey: "loss",
-      color: "#ef4444", // Red
+      color: "#ef4444",
       unit: "%",
       gradientId: "colorLoss",
     },
@@ -236,9 +410,9 @@ export default function NetworkMonitor() {
             </button>
           </div>
 
-          {/* KPI CARDS - Now Clickable Buttons */}
+          {/* KPI CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* 1. Latency Card */}
+            {/* Latency Card */}
             <button
               onClick={() => setActiveChart("latency")}
               className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm relative overflow-hidden group
@@ -274,18 +448,9 @@ export default function NetworkMonitor() {
                   </span>
                 </div>
               </div>
-              {/* Decorative mini chart background */}
-              <div className="absolute bottom-0 left-0 right-0 h-16 opacity-10 group-hover:opacity-20 transition-opacity">
-                <svg
-                  viewBox="0 0 100 20"
-                  className="w-full h-full fill-green-500"
-                >
-                  <path d="M0,20 L0,10 C10,12 20,5 30,10 C40,15 50,8 60,12 C70,16 80,10 90,14 L100,10 L100,20 Z" />
-                </svg>
-              </div>
             </button>
 
-            {/* 2. Bandwidth Card */}
+            {/* Bandwidth Card */}
             <button
               onClick={() => setActiveChart("bandwidth")}
               className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm
@@ -320,7 +485,7 @@ export default function NetworkMonitor() {
               </div>
             </button>
 
-            {/* 3. Packet Loss Card */}
+            {/* Packet Loss Card */}
             <button
               onClick={() => setActiveChart("loss")}
               className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm
@@ -363,7 +528,69 @@ export default function NetworkMonitor() {
             </button>
           </div>
 
-          {/* MAIN DYNAMIC CHART SECTION */}
+          {/* --- EXPORT HISTORY SECTION (NEW) --- */}
+          <div className="mb-6 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="p-2 bg-gray-100 rounded-lg text-gray-600">
+                <FileText size={20} />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-[#1d1d1f]">
+                  Export Reports
+                </h4>
+                <p className="text-xs text-gray-500">
+                  Download PDF history logs
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {/* Time Range Selector */}
+              <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
+                <select
+                  className="bg-transparent text-sm font-medium text-gray-700 px-2 py-1 outline-none cursor-pointer"
+                  value={exportRange}
+                  onChange={(e) => setExportRange(e.target.value as TimeRange)}
+                >
+                  <option value="24h">Last 24 Hours</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="custom">Start From Date</option>
+                </select>
+                {exportRange === "custom" && (
+                  <input
+                    type="date"
+                    className="ml-2 bg-white rounded border border-gray-200 text-sm px-2 py-0.5 outline-none"
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                  />
+                )}
+              </div>
+
+              {/* Download Buttons */}
+              <div className="flex gap-2">
+                <ExportButton
+                  label="Latency"
+                  onClick={() => generatePDF("latency")}
+                  isLoading={isExporting === "latency"}
+                  color="green"
+                />
+                <ExportButton
+                  label="Speed"
+                  onClick={() => generatePDF("bandwidth")}
+                  isLoading={isExporting === "bandwidth"}
+                  color="blue"
+                />
+                <ExportButton
+                  label="Loss"
+                  onClick={() => generatePDF("loss")}
+                  isLoading={isExporting === "loss"}
+                  color="red"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* MAIN CHART SECTION */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 transition-colors duration-300">
             <div className="flex justify-between items-center mb-8">
               <div>
@@ -468,7 +695,7 @@ export default function NetworkMonitor() {
                     itemStyle={{ fontWeight: "bold", color: "#1d1d1f" }}
                     formatter={(value: any) => [
                       `${Number(value).toFixed(1)} ${currentConfig.unit}`,
-                      currentConfig.title.split(" ")[0], // Simpler label in tooltip
+                      currentConfig.title.split(" ")[0],
                     ]}
                     labelFormatter={(label) =>
                       new Date(label).toLocaleTimeString()
@@ -493,5 +720,42 @@ export default function NetworkMonitor() {
         </motion.div>
       </main>
     </div>
+  );
+}
+
+// Sub-component for buttons to keep JSX clean
+function ExportButton({
+  label,
+  onClick,
+  isLoading,
+  color,
+}: {
+  label: string;
+  onClick: () => void;
+  isLoading: boolean;
+  color: string;
+}) {
+  const colorClasses = {
+    green: "hover:bg-green-50 hover:text-green-600 border-gray-200",
+    blue: "hover:bg-blue-50 hover:text-blue-600 border-gray-200",
+    red: "hover:bg-red-50 hover:text-red-600 border-gray-200",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={isLoading}
+      className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all flex items-center gap-2
+        ${colorClasses[color as keyof typeof colorClasses]}
+        ${isLoading ? "opacity-70 cursor-wait" : "bg-white text-gray-600"}
+      `}
+    >
+      {isLoading ? (
+        <RefreshCw size={14} className="animate-spin" />
+      ) : (
+        <Download size={14} />
+      )}
+      {label}
+    </button>
   );
 }
