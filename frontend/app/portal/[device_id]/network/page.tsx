@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Server,
   Download,
-  Calendar,
   FileText,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -28,7 +27,6 @@ import {
 import { usePortal } from "@/providers/PortalProvider";
 import { formatDistanceToNow, subDays, subHours, format } from "date-fns";
 import { useDeviceNetworkStats } from "@/api.device";
-// Import PDF libraries
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -44,14 +42,6 @@ interface MonitorStats {
 type ChartType = "latency" | "bandwidth" | "loss";
 type TimeRange = "24h" | "7d" | "30d" | "custom";
 
-// Mock data initialized for visualization
-const MOCK_HISTORY = Array.from({ length: 20 }, (_, i) => ({
-  timestamp: new Date(Date.now() - (20 - i) * 30000).toISOString(),
-  latency: 15 + Math.random() * 10,
-  loss: Math.random() > 0.8 ? Math.random() * 2 : 0,
-  bandwidth: i % 5 === 0 ? 100 + Math.random() * 50 : null,
-}));
-
 export default function NetworkMonitor() {
   const params = useParams();
   const router = useRouter();
@@ -59,9 +49,14 @@ export default function NetworkMonitor() {
 
   const deviceId = params.device_id as string;
   const device = devices?.find((d) => d?.id === deviceId);
-  const { stats } = useDeviceNetworkStats(deviceId);
 
-  const [isLoading, setIsLoading] = useState(true);
+  // --- INTEGRATION: Use Custom Hook ---
+  const {
+    stats: deviceStats,
+    loading: statsLoading,
+    refetch,
+  } = useDeviceNetworkStats(deviceId);
+
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [activeChart, setActiveChart] = useState<ChartType>("latency");
 
@@ -71,64 +66,58 @@ export default function NetworkMonitor() {
   const [isExporting, setIsExporting] = useState<ChartType | null>(null);
 
   const [history, setHistory] = useState<MonitorStats[]>([]);
-  const [latestStats, setLatestStats] = useState<MonitorStats | null>(null);
 
-  // Derived state for the last known bandwidth
-  const lastKnownBandwidth = useMemo(() => {
-    if (latestStats?.bandwidth)
-      return { val: latestStats.bandwidth, time: latestStats.timestamp };
+  // Local state to hold the consolidated stats for display (handling the null bandwidth logic)
+  const [activeStats, setActiveStats] = useState<MonitorStats | null>(null);
 
-    const found = [...history]
-      .reverse()
-      .find((h) => h.bandwidth !== null && h.bandwidth !== undefined);
-    return found
-      ? { val: found.bandwidth, time: found.timestamp }
-      : { val: 0, time: new Date().toISOString() };
-  }, [latestStats, history]);
+  // Ref to persist the last known bandwidth across re-renders/fetches
+  const lastBandwidthRef = useRef<number | null>(null);
 
-  // --- Data Fetching (Live) ---
-  const fetchData = useCallback(async () => {
-    if (!device) return;
-
-    try {
-      // Replace with your actual API call
-      const res = await fetch(
-        `https://${device.id}.strct.org/api/network/stats`
-      );
-
-      if (!res.ok) {
-        // Simulation fallback for live data
-        const newPoint = {
-          timestamp: new Date().toISOString(),
-          latency: 20 + Math.random() * 15,
-          loss: Math.random() > 0.95 ? 2.0 : 0,
-          is_down: false,
-          bandwidth: Math.random() > 0.9 ? 150 : null,
-        };
-
-        setHistory((prev) => {
-          const newHist = [...prev, newPoint];
-          return newHist.slice(-50);
-        });
-        setLatestStats(newPoint);
-        return;
+  // --- HISTORY ACCUMULATION & PERSISTENCE LOGIC ---
+  useEffect(() => {
+    if (deviceStats) {
+      // 1. Handle Bandwidth Persistence
+      // If incoming bandwidth is not null, update our ref.
+      if (
+        deviceStats.bandwidth !== null &&
+        deviceStats.bandwidth !== undefined
+      ) {
+        lastBandwidthRef.current = deviceStats.bandwidth;
       }
 
-      const data = await res.json();
-      setLatestStats(data.current);
-      setHistory(data.history);
-    } catch (err) {
-      console.error("Failed to fetch stats", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [device]);
+      // If incoming is null, use the Ref (previous known value)
+      const effectiveBandwidth =
+        deviceStats.bandwidth !== null && deviceStats.bandwidth !== undefined
+          ? deviceStats.bandwidth
+          : lastBandwidthRef.current;
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+      const newPoint: MonitorStats = {
+        latency: deviceStats.latency,
+        loss: deviceStats.loss,
+        is_down: deviceStats.isDown,
+        bandwidth: effectiveBandwidth,
+        timestamp: deviceStats.timestamp || new Date().toISOString(),
+      };
+
+      // 2. Update Active Display Stats
+      setActiveStats(newPoint);
+
+      // 3. Update History
+      setHistory((prev) => {
+        // Prevent duplicate entries if timestamp matches the last one
+        if (
+          prev.length > 0 &&
+          prev[prev.length - 1].timestamp === newPoint.timestamp
+        ) {
+          return prev;
+        }
+
+        // Keep the last 50 data points
+        const newHist = [...prev, newPoint];
+        return newHist.slice(-50);
+      });
+    }
+  }, [deviceStats]);
 
   const handleRunSpeedtest = async () => {
     if (!device) return;
@@ -139,19 +128,27 @@ export default function NetworkMonitor() {
       await fetch(`https://${device.id}.strct.org/api/network/speedtest`, {
         method: "GET",
       });
+      // Refresh to get new data immediately
+      refetch();
     } catch (e) {
       alert("Failed to trigger speedtest");
     } finally {
-      setTimeout(() => setIsRunningTest(false), 10);
+      setTimeout(() => setIsRunningTest(false), 2000);
     }
   };
 
-  // --- PDF & Historical Data Logic ---
+  // --- ON MOUNT: Trigger Speedtest ---
+  const initialTestDone = useRef(false);
 
-  /**
-   * Simulates fetching historical data from a database.
-   * In a real app, you would pass start/end dates to your API here.
-   */
+  useEffect(() => {
+    // Only run if device is loaded and we haven't run it yet
+    if (device && !initialTestDone.current) {
+      handleRunSpeedtest();
+      initialTestDone.current = true;
+    }
+  }, [device]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- PDF & Historical Data Logic ---
   const fetchDetailedHistory = async (
     range: TimeRange,
     customStart?: string
@@ -160,7 +157,7 @@ export default function NetworkMonitor() {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     let startDate = new Date();
-    let intervalMinutes = 5; // Granularity
+    let intervalMinutes = 5;
 
     switch (range) {
       case "24h":
@@ -169,11 +166,11 @@ export default function NetworkMonitor() {
         break;
       case "7d":
         startDate = subDays(new Date(), 7);
-        intervalMinutes = 60; // Hourly for 7 days
+        intervalMinutes = 60;
         break;
       case "30d":
         startDate = subDays(new Date(), 30);
-        intervalMinutes = 240; // Every 4 hours
+        intervalMinutes = 240;
         break;
       case "custom":
         startDate = customStart
@@ -187,14 +184,12 @@ export default function NetworkMonitor() {
     const mockData: MonitorStats[] = [];
     let current = new Date(startDate);
 
-    // Generate realistic looking data
     while (current <= endDate) {
       mockData.push({
         timestamp: current.toISOString(),
-        latency: 10 + Math.random() * 30 + (Math.random() > 0.9 ? 100 : 0), // Occasional spikes
+        latency: 10 + Math.random() * 30 + (Math.random() > 0.9 ? 100 : 0),
         loss: Math.random() > 0.95 ? Math.random() * 5 : 0,
         is_down: false,
-        // Bandwidth tests usually happen less frequently
         bandwidth: Math.random() > 0.8 ? 50 + Math.random() * 200 : null,
       });
       current = new Date(current.getTime() + intervalMinutes * 60000);
@@ -208,16 +203,13 @@ export default function NetworkMonitor() {
     setIsExporting(type);
 
     try {
-      // 1. Get Data
       const data = await fetchDetailedHistory(exportRange, customStartDate);
 
-      // 2. Filter data for the specific metric
       const filteredData = data.filter((d) => {
         if (type === "bandwidth") return d.bandwidth !== null;
         return true;
       });
 
-      // 3. Calculate Summary Stats
       const values = filteredData.map((d) =>
         type === "latency"
           ? d.latency || 0
@@ -230,10 +222,8 @@ export default function NetworkMonitor() {
       const max = Math.max(...values, 0);
       const min = Math.min(...values, 0);
 
-      // 4. Create PDF
       const doc = new jsPDF();
 
-      // Header
       doc.setFontSize(18);
       doc.text("Network Performance Report", 14, 20);
 
@@ -242,7 +232,6 @@ export default function NetworkMonitor() {
       doc.text(`Device: ${device.friendly_name || device.id}`, 14, 30);
       doc.text(`Generated: ${format(new Date(), "PPpp")}`, 14, 36);
 
-      // Metric Title
       doc.setFontSize(14);
       doc.setTextColor(0);
       doc.text(
@@ -253,7 +242,6 @@ export default function NetworkMonitor() {
         50
       );
 
-      // Summary Box
       const unit =
         type === "latency" ? "ms" : type === "bandwidth" ? "Mbps" : "%";
 
@@ -275,7 +263,6 @@ export default function NetworkMonitor() {
         headStyles: { fillColor: [29, 29, 31] },
       });
 
-      // Detailed Data Table
       doc.text("Detailed Logs", 14, (doc as any).lastAutoTable.finalY + 15);
 
       const tableRows = filteredData.map((item) => [
@@ -303,7 +290,6 @@ export default function NetworkMonitor() {
         },
       });
 
-      // Save
       doc.save(`${device.id}_${type}_report.pdf`);
     } catch (error) {
       console.error("PDF Generation Error", error);
@@ -323,7 +309,7 @@ export default function NetworkMonitor() {
   const chartConfig = {
     latency: {
       title: "Latency History",
-      description: "Response time to 8.8.8.8 over the last hour",
+      description: "Response time to 8.8.8.8",
       dataKey: "latency",
       color: "#22c55e",
       unit: "ms",
@@ -379,14 +365,18 @@ export default function NetworkMonitor() {
             <div>
               <h1 className="text-3xl font-bold text-[#1d1d1f] flex items-center gap-3">
                 Network Monitor
-                {latestStats?.is_down ? (
+                {activeStats?.is_down ? (
                   <span className="px-3 py-1 bg-red-100 text-red-600 text-xs font-bold rounded-full uppercase tracking-wide">
                     Offline
                   </span>
                 ) : (
                   <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase tracking-wide flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    Live
+                    <span
+                      className={`w-2 h-2 rounded-full bg-green-500 ${
+                        statsLoading ? "opacity-50" : "animate-pulse"
+                      }`}
+                    />
+                    {statsLoading ? "Updating..." : "Live"}
                   </span>
                 )}
               </h1>
@@ -429,11 +419,11 @@ export default function NetworkMonitor() {
                 </div>
                 <div
                   className={`font-bold text-sm ${getLatencyColor(
-                    latestStats?.latency || 0
+                    activeStats?.latency || 0
                   )}`}
                 >
-                  {latestStats?.latency
-                    ? latestStats.latency < 50
+                  {activeStats?.latency
+                    ? activeStats.latency < 50
                       ? "Good"
                       : "Poor"
                     : "--"}
@@ -442,7 +432,7 @@ export default function NetworkMonitor() {
               <div className="relative z-10">
                 <div className="text-gray-500 text-sm font-medium">Latency</div>
                 <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
-                  {latestStats?.latency ? latestStats.latency.toFixed(1) : "--"}
+                  {activeStats?.latency ? activeStats.latency.toFixed(1) : "--"}
                   <span className="text-lg text-gray-400 font-medium ml-1">
                     ms
                   </span>
@@ -467,7 +457,10 @@ export default function NetworkMonitor() {
                 </div>
                 <div className="text-xs text-gray-400 font-medium flex items-center gap-1">
                   <Clock size={12} />
-                  {formatDistanceToNow(new Date(lastKnownBandwidth.time))} ago
+                  {activeStats?.timestamp
+                    ? formatDistanceToNow(new Date(activeStats.timestamp)) +
+                      " ago"
+                    : "Unknown"}
                 </div>
               </div>
               <div>
@@ -475,8 +468,8 @@ export default function NetworkMonitor() {
                   Download Speed
                 </div>
                 <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
-                  {lastKnownBandwidth.val
-                    ? lastKnownBandwidth.val.toFixed(1)
+                  {activeStats?.bandwidth
+                    ? activeStats.bandwidth.toFixed(1)
                     : "--"}
                   <span className="text-lg text-gray-400 font-medium ml-1">
                     Mbps
@@ -499,18 +492,18 @@ export default function NetworkMonitor() {
               <div className="flex justify-between items-start mb-4">
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                    latestStats?.loss && latestStats.loss > 0
+                    activeStats?.loss && activeStats.loss > 0
                       ? "bg-red-50 text-red-500"
                       : "bg-purple-50 text-purple-600"
                   }`}
                 >
-                  {latestStats?.loss && latestStats.loss > 0 ? (
+                  {activeStats?.loss && activeStats.loss > 0 ? (
                     <AlertTriangle size={24} />
                   ) : (
                     <Server size={24} />
                   )}
                 </div>
-                {latestStats?.loss === 0 && (
+                {activeStats?.loss === 0 && (
                   <CheckCircle2 size={20} className="text-green-500" />
                 )}
               </div>
@@ -519,7 +512,7 @@ export default function NetworkMonitor() {
                   Packet Loss
                 </div>
                 <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
-                  {latestStats?.loss ? latestStats.loss.toFixed(1) : "0"}
+                  {activeStats?.loss ? activeStats.loss.toFixed(1) : "0"}
                   <span className="text-lg text-gray-400 font-medium ml-1">
                     %
                   </span>
@@ -528,7 +521,7 @@ export default function NetworkMonitor() {
             </button>
           </div>
 
-          {/* --- EXPORT HISTORY SECTION (NEW) --- */}
+          {/* --- EXPORT HISTORY SECTION --- */}
           <div className="mb-6 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="p-2 bg-gray-100 rounded-lg text-gray-600">
@@ -628,7 +621,7 @@ export default function NetworkMonitor() {
 
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={history.length > 0 ? history : MOCK_HISTORY}>
+                <AreaChart data={history.length > 0 ? history : []}>
                   <defs>
                     <linearGradient
                       id="colorLatency"
@@ -715,6 +708,11 @@ export default function NetworkMonitor() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              {history.length === 0 && !statsLoading && (
+                <div className="flex items-center justify-center h-full w-full absolute top-0 left-0">
+                  <p className="text-gray-400 text-sm">Waiting for data...</p>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

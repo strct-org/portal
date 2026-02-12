@@ -151,18 +151,22 @@ export const useDeviceNetworkStats = (selectedDeviceId: string | null) => {
 
   const fetchStats = useCallback(async () => {
     if (!selectedDeviceId) return;
-
+    const url = urls[selectedDeviceId];
+    if (!url) {
+      console.log("[NetworkStats] Waiting for device URL...");
+      return;
+    }
     setLoading(true);
     setError(null);
-    const url = urls[selectedDeviceId];
 
     try {
-      console.log("[NetworkStats] Fetching data...");`${url}/api/network/now`;
-      console.log(`${url}/api/network/now`);
-     
+      console.log("[NetworkStats] Fetching data...");
+      `${url}/api/network/stats`;
+      console.log(` mrk to ${url}/api/network/stats`);
 
-      const res = await fetch(`${url}/api/network/now`, {
-        signal: AbortSignal.timeout(5000),
+      const res = await fetch(`${url}/api/network/stats`, {
+        method: "GET",
+        signal: AbortSignal.timeout(3000),
       });
 
       if (!res.ok) throw new Error("Failed to fetch network metrics");
