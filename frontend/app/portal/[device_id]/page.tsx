@@ -12,6 +12,7 @@ import {
   Server,
   Wifi,
   X,
+  RouteIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePortal } from "@/providers/PortalProvider";
@@ -63,7 +64,7 @@ export default function DeviceHub() {
       icon: Shield,
       color: "bg-red-500",
       path: `/portal/${deviceId}/adblock`,
-      status: "inactive" as const,
+      status: "active" as const,
       // status: "beta" as const,
     },
     {
@@ -78,7 +79,7 @@ export default function DeviceHub() {
     {
       id: "wifi",
       title: "Wi-Fi Manager",
-      description: "Configure hotspot settings and network credentials.",
+      description: "Configure hotspot settings and network credentials",
       icon: Wifi,
       color: "bg-purple-500",
       path: `/portal/${deviceId}/network`,
@@ -87,11 +88,21 @@ export default function DeviceHub() {
     {
       id: "web",
       title: "Web Hosting",
-      description: "Host simple static websites directly from your device.",
+      description: "Host simple static websites directly from your device",
       icon: Globe,
       color: "bg-pink-500",
-      path: `/portal/${deviceId}/web`,
-      status: "inactive" as const,
+      path: `/portal/${deviceId}/web_hosting`,
+      status: "active" as const,
+    },
+    {
+      id: "router",
+      title: "Router",
+      description:
+        "Customize your internet experience with advanced routing options",
+      icon: Wifi,
+      color: "bg-blue-500",
+      path: `/portal/${deviceId}/router`,
+      status: "active" as const,
     },
   ];
 
@@ -185,7 +196,6 @@ export default function DeviceHub() {
   );
 }
 
-
 function SettingsModal({
   onClose,
   deviceName,
@@ -258,8 +268,6 @@ function SettingsModal({
             </div>
           </div>
 
-          
-
           <div className="p-4 rounded-2xl border border-gray-100">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
               Actions
@@ -290,7 +298,6 @@ function SettingsModal({
     </div>
   );
 }
-
 
 function FeatureCard({
   title,

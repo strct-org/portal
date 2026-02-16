@@ -30,7 +30,6 @@ import { useDeviceNetworkStats } from "@/api.device";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// --- Types ---
 interface MonitorStats {
   latency: number | null; // ms
   loss: number | null; // %
@@ -50,7 +49,6 @@ export default function NetworkMonitor() {
   const deviceId = params.device_id as string;
   const device = devices?.find((d) => d?.id === deviceId);
 
-  // --- INTEGRATION: Use Custom Hook ---
   const {
     stats: deviceStats,
     loading: statsLoading,
@@ -60,24 +58,18 @@ export default function NetworkMonitor() {
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [activeChart, setActiveChart] = useState<ChartType>("latency");
 
-  // --- Export State ---
   const [exportRange, setExportRange] = useState<TimeRange>("24h");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [isExporting, setIsExporting] = useState<ChartType | null>(null);
 
   const [history, setHistory] = useState<MonitorStats[]>([]);
 
-  // Local state to hold the consolidated stats for display (handling the null bandwidth logic)
   const [activeStats, setActiveStats] = useState<MonitorStats | null>(null);
 
-  // Ref to persist the last known bandwidth across re-renders/fetches
   const lastBandwidthRef = useRef<number | null>(null);
 
-  // --- HISTORY ACCUMULATION & PERSISTENCE LOGIC ---
   useEffect(() => {
     if (deviceStats) {
-      // 1. Handle Bandwidth Persistence
-      // If incoming bandwidth is not null, update our ref.
       if (
         deviceStats.bandwidth !== null &&
         deviceStats.bandwidth !== undefined
@@ -85,7 +77,6 @@ export default function NetworkMonitor() {
         lastBandwidthRef.current = deviceStats.bandwidth;
       }
 
-      // If incoming is null, use the Ref (previous known value)
       const effectiveBandwidth =
         deviceStats.bandwidth !== null && deviceStats.bandwidth !== undefined
           ? deviceStats.bandwidth
@@ -99,12 +90,9 @@ export default function NetworkMonitor() {
         timestamp: deviceStats.timestamp || new Date().toISOString(),
       };
 
-      // 2. Update Active Display Stats
       setActiveStats(newPoint);
 
-      // 3. Update History
       setHistory((prev) => {
-        // Prevent duplicate entries if timestamp matches the last one
         if (
           prev.length > 0 &&
           prev[prev.length - 1].timestamp === newPoint.timestamp
@@ -112,7 +100,6 @@ export default function NetworkMonitor() {
           return prev;
         }
 
-        // Keep the last 50 data points
         const newHist = [...prev, newPoint];
         return newHist.slice(-50);
       });
@@ -137,23 +124,19 @@ export default function NetworkMonitor() {
     }
   };
 
-  // --- ON MOUNT: Trigger Speedtest ---
   const initialTestDone = useRef(false);
 
   useEffect(() => {
-    // Only run if device is loaded and we haven't run it yet
     if (device && !initialTestDone.current) {
       handleRunSpeedtest();
       initialTestDone.current = true;
     }
-  }, [device]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [device]); 
 
-  // --- PDF & Historical Data Logic ---
   const fetchDetailedHistory = async (
     range: TimeRange,
     customStart?: string
   ) => {
-    // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     let startDate = new Date();
