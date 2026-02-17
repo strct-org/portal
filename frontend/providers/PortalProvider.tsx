@@ -1,6 +1,6 @@
 "use client";
 
-import { apiService } from "@/api";
+import { apiService } from "@/api/api";
 import { Device } from "@/types/api.device";
 import { User } from "@/types/api.user";
 import { useAuth } from "@clerk/nextjs";

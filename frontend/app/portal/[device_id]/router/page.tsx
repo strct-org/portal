@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Wifi,
@@ -16,11 +16,53 @@ import {
   Server,
   Zap,
   Activity,
+  Smartphone,
+  Laptop,
+  Ban,
+  Gauge,
+  Signal,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouterSettings } from "@/api.device";
 
+// Mock data to simulate 'arp -a' and 'iftop' results
+const MOCK_DEVICES = [
+  {
+    id: 1,
+    name: "Admin iPhone",
+    ip: "192.168.1.5",
+    mac: "A1:B2:C3:D4:E5",
+    type: "mobile",
+    usage: "1.2 MB/s",
+    blocked: false,
+    limited: false,
+  },
+  {
+    id: 2,
+    name: "Living Room TV",
+    ip: "192.168.1.12",
+    mac: "AA:BB:CC:DD:EE",
+    type: "other",
+    usage: "450 KB/s",
+    blocked: false,
+    limited: true,
+  },
+  {
+    id: 3,
+    name: "Unknown Device",
+    ip: "192.168.1.24",
+    mac: "11:22:33:44:55",
+    type: "laptop",
+    usage: "12 KB/s",
+    blocked: true,
+    limited: false,
+  },
+];
+
 export default function RouterDashboard() {
+    const params = useParams();
+  const deviceId = params.device_id as string;
+
   const router = useRouter();
   const {
     config,
@@ -31,10 +73,13 @@ export default function RouterDashboard() {
     addPortRule,
     removePortRule,
     saveChanges,
-  } = useRouterSettings();
+  } = useRouterSettings(deviceId);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showAddPort, setShowAddPort] = useState(false);
+
+  // State for Connected Devices (arp -a / iptables)
+  const [devices, setDevices] = useState(MOCK_DEVICES);
 
   // Temporary state for new port rule
   const [newPortName, setNewPortName] = useState("");
@@ -55,18 +100,34 @@ export default function RouterDashboard() {
     setShowAddPort(false);
   };
 
+  // Toggle Block (iptables DROP)
+  const toggleBlockDevice = (id: number) => {
+    setDevices(
+      devices.map((d) => (d.id === id ? { ...d, blocked: !d.blocked } : d))
+    );
+    // In real app: call API to run `iptables -A INPUT -m mac --mac-source ... -j DROP`
+  };
+
+  // Toggle Rate Limit (wondershaper)
+  const toggleLimitDevice = (id: number) => {
+    setDevices(
+      devices.map((d) => (d.id === id ? { ...d, limited: !d.limited } : d))
+    );
+    // In real app: call API to run `wondershaper`
+  };
+
   if (loading || !config) {
     return (
       <div className="min-h-screen bg-[#f2f2f7] flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" />
-        <p className="text-gray-500 font-medium">Connecting to Router...</p>
+        <p className="text-gray-500 font-medium">Connecting to Orange Pi...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f]">
-      {/* Sticky Bottom Save Bar (Only visible when changes exist) */}
+      {/* Sticky Bottom Save Bar */}
       <AnimatePresence>
         {hasChanges && (
           <motion.div
@@ -78,14 +139,14 @@ export default function RouterDashboard() {
             <div className="bg-[#1d1d1f]/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Activity className="text-yellow-400 animate-pulse" size={20} />
-                <span className="font-medium">Unsaved changes detected</span>
+                <span className="font-medium">Configuration changed</span>
               </div>
               <button
                 onClick={saveChanges}
                 disabled={saving}
                 className="bg-white text-black px-6 py-2 rounded-xl font-bold hover:scale-105 transition-transform flex items-center gap-2"
               >
-                {saving ? "Applying..." : "Apply Changes"}
+                {saving ? "Running Scripts..." : "Apply Config"}
                 {!saving && <Save size={16} />}
               </button>
             </div>
@@ -111,10 +172,10 @@ export default function RouterDashboard() {
 
           <div className="mb-10">
             <h1 className="text-3xl font-bold text-[#1d1d1f]">
-              Router Settings
+              Router Control Center
             </h1>
             <p className="text-gray-500 mt-2">
-              Advanced network configuration made simple.
+              Manage Wi-Fi, Firewall, and Connected Devices.
             </p>
           </div>
 
@@ -125,14 +186,16 @@ export default function RouterDashboard() {
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
                   <Wifi size={20} />
                 </div>
-                <h2 className="text-xl font-bold">Wireless Network</h2>
+                <div>
+                  <h2 className="text-xl font-bold">Wireless Settings</h2>
+                  <p className="text-xs text-gray-400">hostapd configuration</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* SSID Input */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    Wi-Fi Name (SSID)
+                    SSID Name
                   </label>
                   <input
                     type="text"
@@ -142,7 +205,6 @@ export default function RouterDashboard() {
                   />
                 </div>
 
-                {/* Password Input */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Password
@@ -166,11 +228,11 @@ export default function RouterDashboard() {
                 </div>
               </div>
 
-              {/* Toggles */}
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Advanced Wi-Fi Toggles */}
+              <div className="mt-8 grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <ToggleCard
                   icon={<Lock size={18} />}
-                  label="WPA3 Security"
+                  label="WPA3 Only"
                   active={config.security_mode === "WPA3"}
                   onClick={() =>
                     updateSetting(
@@ -181,30 +243,147 @@ export default function RouterDashboard() {
                   color="green"
                 />
                 <ToggleCard
-                  icon={<Zap size={18} />}
-                  label="5GHz Boost"
-                  active={
-                    config.frequency === "DUAL" || config.frequency === "5GHz"
-                  }
+                  icon={<Signal size={18} />}
+                  label="Signal Boost"
+                  subLabel="30dBm Power"
+                  active={config.tx_power === "30"}
                   onClick={() =>
                     updateSetting(
-                      "frequency",
-                      config.frequency === "2.4GHz" ? "DUAL" : "2.4GHz"
+                      "tx_power",
+                      config.tx_power === "30" ? "20" : "30"
                     )
                   }
                   color="purple"
                 />
                 <ToggleCard
                   icon={<EyeOff size={18} />}
-                  label="Hide Network"
+                  label="Hidden Net"
+                  subLabel="No Broadcast"
                   active={config.is_hidden}
                   onClick={() => updateSetting("is_hidden", !config.is_hidden)}
                   color="gray"
                 />
+                <ToggleCard
+                  icon={<Zap size={18} />}
+                  label="5GHz"
+                  active={config.frequency === "5GHz"}
+                  onClick={() =>
+                    updateSetting(
+                      "frequency",
+                      config.frequency === "5GHz" ? "2.4GHz" : "5GHz"
+                    )
+                  }
+                  color="blue"
+                />
               </div>
             </div>
 
-            {/* 2. DNS Settings */}
+            {/* 2. Connected Devices (New Section for Kick/Limit) */}
+            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 col-span-1 lg:col-span-2">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                    <Smartphone size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Connected Devices</h2>
+                    <p className="text-xs text-gray-400">
+                      {devices.length} active •{" "}
+                      {devices.filter((d) => d.blocked).length} blocked
+                    </p>
+                  </div>
+                </div>
+                <div className="text-xs font-bold px-3 py-1 bg-green-100 text-green-700 rounded-full animate-pulse">
+                  Live Traffic
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {devices.map((device) => (
+                  <div
+                    key={device.id}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      device.blocked
+                        ? "bg-red-50 border-red-100 opacity-75"
+                        : "bg-white border-gray-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`p-2 rounded-lg ${
+                          device.blocked
+                            ? "bg-red-200 text-red-700"
+                            : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {device.type === "mobile" ? (
+                          <Smartphone size={18} />
+                        ) : (
+                          <Laptop size={18} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                          {device.name}
+                          {device.blocked && (
+                            <span className="text-[10px] bg-red-600 text-white px-1.5 rounded">
+                              BLOCKED
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 font-mono">
+                          {device.ip} • {device.mac}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 md:gap-4">
+                      {/* Bandwidth Usage (iftop) */}
+                      {!device.blocked && (
+                        <div className="text-right hidden sm:block">
+                          <div className="text-xs font-bold text-gray-700 flex items-center gap-1 justify-end">
+                            <Activity size={12} className="text-blue-500" />
+                            {device.usage}
+                          </div>
+                          <div className="text-[10px] text-gray-400">
+                            Current Usage
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="h-8 w-[1px] bg-gray-200 mx-2 hidden sm:block" />
+
+                      {/* Action Buttons */}
+                      <button
+                        onClick={() => toggleLimitDevice(device.id)}
+                        title="Limit Bandwidth"
+                        className={`p-2 rounded-lg transition-colors ${
+                          device.limited
+                            ? "bg-yellow-100 text-yellow-600"
+                            : "hover:bg-gray-100 text-gray-400"
+                        }`}
+                      >
+                        <Gauge size={18} />
+                      </button>
+
+                      <button
+                        onClick={() => toggleBlockDevice(device.id)}
+                        title="Block Device"
+                        className={`p-2 rounded-lg transition-colors ${
+                          device.blocked
+                            ? "bg-red-600 text-white shadow-md"
+                            : "hover:bg-red-50 text-gray-400 hover:text-red-500"
+                        }`}
+                      >
+                        <Ban size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. DNS Settings */}
             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center">
@@ -215,39 +394,39 @@ export default function RouterDashboard() {
 
               <div className="space-y-3">
                 <DNSOption
-                  label="Cloudflare (Fastest)"
-                  sub="1.1.1.1"
+                  label="Cloudflare (1.1.1.1)"
+                  sub="Fastest / Privacy Focused"
                   selected={config.dns_provider === "cloudflare"}
                   onClick={() => updateSetting("dns_provider", "cloudflare")}
                 />
                 <DNSOption
-                  label="Google Public DNS"
-                  sub="8.8.8.8"
+                  label="Google (8.8.8.8)"
+                  sub="Reliable / Standard"
                   selected={config.dns_provider === "google"}
                   onClick={() => updateSetting("dns_provider", "google")}
                 />
                 <DNSOption
                   label="ISP Default"
-                  sub="Automatic"
+                  sub="Automatic Assignment"
                   selected={config.dns_provider === "isp"}
                   onClick={() => updateSetting("dns_provider", "isp")}
                 />
               </div>
             </div>
 
-            {/* 3. Firewall & Security */}
+            {/* 4. Firewall & Security */}
             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-green-50 text-green-500 flex items-center justify-center">
                   <ShieldCheck size={20} />
                 </div>
-                <h2 className="text-xl font-bold">Firewall</h2>
+                <h2 className="text-xl font-bold">Firewall Rules</h2>
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 rounded-xl bg-[#f2f2f7]">
-                  <span className="font-semibold text-gray-700">
-                    Block Incoming Threats
+                  <span className="font-semibold text-gray-700 text-sm">
+                    Block Incoming (UFW)
                   </span>
                   <Switch
                     active={config.firewall_enabled}
@@ -259,22 +438,9 @@ export default function RouterDashboard() {
                     }
                   />
                 </div>
-
                 <div className="flex items-center justify-between p-3 rounded-xl bg-[#f2f2f7]">
-                  <span className="font-semibold text-gray-700">
-                    UPnP (Gaming)
-                  </span>
-                  <Switch
-                    active={config.upnp_enabled}
-                    onChange={() =>
-                      updateSetting("upnp_enabled", !config.upnp_enabled)
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[#f2f2f7]">
-                  <span className="font-semibold text-gray-700">
-                    Guest Network
+                  <span className="font-semibold text-gray-700 text-sm">
+                    Isolate Guest Network
                   </span>
                   <Switch
                     active={config.guest_network}
@@ -286,7 +452,7 @@ export default function RouterDashboard() {
               </div>
             </div>
 
-            {/* 4. Port Forwarding (Simplified) */}
+            {/* 5. Port Forwarding */}
             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 col-span-1 lg:col-span-2">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -296,19 +462,18 @@ export default function RouterDashboard() {
                   <div>
                     <h2 className="text-xl font-bold">Port Forwarding</h2>
                     <p className="text-sm text-gray-400">
-                      Allow external access to devices
+                      Expose internal services
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowAddPort(true)}
-                  className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center hover:scale-110 transition-transform"
+                  className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center hover:scale-110 transition-transform shadow-lg"
                 >
                   <Plus size={20} />
                 </button>
               </div>
 
-              {/* List of Rules */}
               <div className="space-y-3">
                 {config.port_rules.map((rule) => (
                   <div
@@ -316,13 +481,15 @@ export default function RouterDashboard() {
                     className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                       <div>
                         <div className="font-bold text-gray-900">
                           {rule.name}
                         </div>
                         <div className="text-xs text-gray-400 font-mono">
-                          {rule.device_ip}:{rule.port} • {rule.protocol}
+                          {rule.device_ip}:{rule.port}{" "}
+                          <span className="text-gray-300">|</span>{" "}
+                          {rule.protocol}
                         </div>
                       </div>
                     </div>
@@ -334,53 +501,52 @@ export default function RouterDashboard() {
                     </button>
                   </div>
                 ))}
-
-                {config.port_rules.length === 0 && (
-                  <div className="text-center py-8 text-gray-400 text-sm">
-                    No active port forwarding rules.
+                {config.port_rules.length === 0 && !showAddPort && (
+                  <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                    No active rules. Click + to add one.
                   </div>
                 )}
               </div>
 
-              {/* Add Rule Modal/Inline */}
+              {/* Add Rule Form */}
               <AnimatePresence>
                 {showAddPort && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200"
+                    className="overflow-hidden mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200 shadow-inner"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <input
-                        placeholder="Service Name (e.g. Minecraft)"
-                        className="bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 outline-none"
+                        placeholder="Name (e.g. Web)"
+                        className="bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 outline-none focus:ring-2 focus:ring-blue-100"
                         value={newPortName}
                         onChange={(e) => setNewPortName(e.target.value)}
                       />
                       <input
-                        placeholder="Device IP (192.168.1.X)"
-                        className="bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 outline-none"
+                        placeholder="IP (192.168.1.X)"
+                        className="bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 outline-none focus:ring-2 focus:ring-blue-100"
                         value={newPortIP}
                         onChange={(e) => setNewPortIP(e.target.value)}
                       />
                       <input
-                        placeholder="Port (e.g. 25565)"
+                        placeholder="Port (e.g. 80)"
                         type="number"
-                        className="bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 outline-none"
+                        className="bg-white px-3 py-2 rounded-lg text-sm border border-gray-200 outline-none focus:ring-2 focus:ring-blue-100"
                         value={newPortNum}
                         onChange={(e) => setNewPortNum(e.target.value)}
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={handleAddPort}
-                          className="flex-1 bg-black text-white rounded-lg text-sm font-bold"
+                          className="flex-1 bg-black text-white rounded-lg text-sm font-bold shadow-md hover:bg-gray-800"
                         >
                           Add
                         </button>
                         <button
                           onClick={() => setShowAddPort(false)}
-                          className="px-3 bg-gray-200 text-gray-600 rounded-lg text-sm font-bold"
+                          className="px-3 bg-white text-gray-600 border border-gray-200 rounded-lg text-sm font-bold hover:bg-gray-100"
                         >
                           Cancel
                         </button>
@@ -399,27 +565,33 @@ export default function RouterDashboard() {
 
 // --- Helper Components ---
 
-function ToggleCard({ icon, label, active, onClick, color }: any) {
+function ToggleCard({ icon, label, subLabel, active, onClick, color }: any) {
   const activeColors: any = {
     green: "bg-green-100 text-green-700 border-green-200",
     purple: "bg-purple-100 text-purple-700 border-purple-200",
+    blue: "bg-blue-100 text-blue-700 border-blue-200",
     gray: "bg-gray-200 text-gray-700 border-gray-300",
   };
 
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-300 ${
+      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-300 ${
         active
-          ? activeColors[color] || "bg-blue-100 text-blue-700 border-blue-200"
-          : "bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100"
+          ? activeColors[color] ||
+            "bg-blue-100 text-blue-700 border-blue-200 shadow-sm"
+          : "bg-white text-gray-400 border-gray-100 hover:bg-gray-50 hover:border-gray-200"
       }`}
     >
       <div className="mb-2">{icon}</div>
       <div className="text-xs font-bold uppercase tracking-wide">{label}</div>
-      <div className="text-[10px] mt-1 opacity-75">
-        {active ? "Enabled" : "Disabled"}
-      </div>
+      {subLabel && (
+        <div className="text-[10px] opacity-75 mt-0.5">{subLabel}</div>
+      )}
+
+      {active && (
+        <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-current opacity-50" />
+      )}
     </button>
   );
 }
@@ -453,12 +625,12 @@ function Switch({ active, onChange }: any) {
   return (
     <button
       onClick={onChange}
-      className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ease-in-out ${
+      className={`w-11 h-6 rounded-full p-1 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
         active ? "bg-green-500" : "bg-gray-300"
       }`}
     >
       <div
-        className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+        className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
           active ? "translate-x-5" : "translate-x-0"
         }`}
       />

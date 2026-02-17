@@ -1,5 +1,5 @@
-import { Device, DeviceParams } from "./types/api.device";
-import { User } from "./types/api.user";
+import { Device, DeviceParams } from "@/types/api.device";
+import { User } from "@/types/api.user";
 
 class ApiService {
   private baseUrl: string;
@@ -155,10 +155,13 @@ class ApiService {
     token: string,
     deviceId: string
   ): Promise<DeviceParams> {
-    return this.makeRequest<DeviceParams>(`/api/v1/device/${deviceId}network_stats`, {
-      method: "GET",
-      token,
-    });
+    return this.makeRequest<DeviceParams>(
+      `/api/v1/device/${deviceId}network_stats`,
+      {
+        method: "GET",
+        token,
+      }
+    );
   }
 }
 

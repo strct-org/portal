@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { apiService } from "@/api";
 import { usePortal } from "@/providers/PortalProvider";
 import { useAuth } from "@clerk/nextjs";
 import { useAllDevicesLiveStats, DeviceLiveStats } from "@/api.device";
+import { apiService } from "@/api/api";
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return "0 B";

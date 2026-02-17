@@ -200,8 +200,6 @@ export const useDeviceNetworkStats = (selectedDeviceId: string | null) => {
   return { stats, loading, error, refetch: fetchStats };
 };
 
-
-
 export interface TrafficPoint {
   time: string;
   total: number;
@@ -247,7 +245,7 @@ export const useDeviceAdBlockerStats = (selectedDeviceId: string | null) => {
       if (!res.ok) throw new Error("Failed to fetch adblock stats");
 
       const data: AdBlockerStats = await res.json();
-      console.log(data)
+      console.log(data);
       setStats(data);
       setError(null);
     } catch (err) {
@@ -311,10 +309,6 @@ export const useDeviceAdBlockerStats = (selectedDeviceId: string | null) => {
   };
 };
 
-
-
-export type DNSType = "cloudflare" | "google" | "isp" | "custom";
-
 export interface PortRule {
   id: string;
   name: string;
@@ -325,52 +319,103 @@ export interface PortRule {
 
 export interface RouterConfig {
   ssid: string;
-  password?: string; // Hidden by default usually
-  security_mode: "WPA2" | "WPA3" | "OPEN";
+  password: string;
+  security_mode: "WPA2" | "WPA3";
   is_hidden: boolean;
   frequency: "2.4GHz" | "5GHz" | "DUAL";
-  guest_network: boolean;
-  dns_provider: DNSType;
+  tx_power: "20" | "30"; // dBm
+  dns_provider: "cloudflare" | "google" | "isp";
   firewall_enabled: boolean;
   upnp_enabled: boolean;
+  guest_network: boolean;
   port_rules: PortRule[];
 }
 
-// --- Mock Initial Data ---
-const MOCK_ROUTER_CONFIG: RouterConfig = {
-  ssid: "Starlink-LivingRoom",
-  password: "supersecretpassword",
-  security_mode: "WPA3",
-  is_hidden: false,
-  frequency: "DUAL",
-  guest_network: false,
-  dns_provider: "cloudflare",
-  firewall_enabled: true,
-  upnp_enabled: false,
-  port_rules: [
-    { id: "1", name: "Minecraft Server", port: 25565, device_ip: "192.168.1.15", protocol: "TCP" },
-    { id: "2", name: "Plex Media", port: 32400, device_ip: "192.168.1.10", protocol: "BOTH" },
-  ],
-};
+export interface ConnectedDevice {
+  id: string;
+  mac: string;
+  ip: string;
+  name: string;
+  type: "mobile" | "laptop" | "desktop" | "other";
+  usage: string; // e.g. "1.2 MB/s"
+  blocked: boolean;
+  limited: boolean;
+}
 
-export const useRouterSettings = () => {
+// --- The Hook ---
+
+export const useRouterSettings = (selectedDeviceId: string | null) => {
+  const urls = useDeviceUrls();
+
   const [config, setConfig] = useState<RouterConfig | null>(null);
+  const [devices, setDevices] = useState<ConnectedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const url = selectedDeviceId ? urls[selectedDeviceId] : null;
 
-  // Initial Fetch
-  useEffect(() => {
-    // Simulate API fetch
-    const timer = setTimeout(() => {
-      setConfig(JSON.parse(JSON.stringify(MOCK_ROUTER_CONFIG))); // Deep copy
+  // 1. Initial Fetch (Config & Devices)
+  const fetchData = useCallback(async () => {
+    if (!url) return;
+    try {
+      // Fetch Config
+      const configRes = await fetch(`${url}/api/router/config`, {
+        method: "GET",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        setConfig(configData);
+      }
+
+      // Fetch Devices
+      const devicesRes = await fetch(`${url}/api/router/devices`, {
+        method: "GET",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (devicesRes.ok) {
+        const devicesData = await devicesRes.json();
+        setDevices(devicesData);
+      }
+    } catch (err) {
+      console.error("Failed to fetch router settings:", err);
+    } finally {
       setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  }, [url]);
 
-  // Generic Updater
-  const updateSetting = <K extends keyof RouterConfig>(key: K, value: RouterConfig[K]) => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // 2. Poll for Live Traffic / Device Status
+  useEffect(() => {
+    if (!url || loading) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${url}/api/router/devices`, {
+          method: "GET",
+          signal: AbortSignal.timeout(4000), // Short timeout for polling
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDevices(data);
+        }
+      } catch (err) {
+        // Silent fail on polling errors to not disrupt UI
+        console.warn("Polling devices failed", err);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [url, loading]);
+
+  // 3. Generic Config Updater (Local State Only)
+  const updateSetting = <K extends keyof RouterConfig>(
+    key: K,
+    value: RouterConfig[K]
+  ) => {
     setConfig((prev) => {
       if (!prev) return null;
       setHasChanges(true);
@@ -378,19 +423,21 @@ export const useRouterSettings = () => {
     });
   };
 
-  // Add Port Rule
+  // 4. Port Forwarding Logic (Local State Only)
   const addPortRule = (rule: Omit<PortRule, "id">) => {
     setConfig((prev) => {
       if (!prev) return null;
       setHasChanges(true);
       return {
         ...prev,
-        port_rules: [...prev.port_rules, { ...rule, id: Math.random().toString() }],
+        port_rules: [
+          ...prev.port_rules,
+          { ...rule, id: Math.random().toString() }, // Temp ID until saved
+        ],
       };
     });
   };
 
-  // Remove Port Rule
   const removePortRule = (id: string) => {
     setConfig((prev) => {
       if (!prev) return null;
@@ -402,33 +449,97 @@ export const useRouterSettings = () => {
     });
   };
 
-  // Save Changes
+  // 5. Device Blocking (Immediate API Call)
+  // We don't wait for "Save" to block a user; it happens immediately.
+  const toggleBlockDevice = async (
+    mac: string,
+    currentBlockStatus: boolean
+  ) => {
+    // Optimistic UI Update
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.mac === mac ? { ...d, blocked: !currentBlockStatus } : d
+      )
+    );
+
+    try {
+      await fetch(`${url}/api/router/block`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mac: mac,
+          block: !currentBlockStatus,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to toggle block status:", err);
+      // Revert on failure
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.mac === mac ? { ...d, blocked: currentBlockStatus } : d
+        )
+      );
+    }
+  };
+
+  // 6. Device Limiting (Immediate API Call - Placeholder)
+  const toggleLimitDevice = async (
+    mac: string,
+    currentLimitStatus: boolean
+  ) => {
+    // Optimistic Update
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.mac === mac ? { ...d, limited: !currentLimitStatus } : d
+      )
+    );
+
+    // Note: You need to add /api/router/limit to your Go backend to support this fully
+    // For now, we just update the UI state.
+    console.log("Limit toggled for", mac);
+  };
+
+  // 7. Save Changes (POST Config)
   const saveChanges = async () => {
-    if (!config) return;
+    if (!config || !url) return;
     setSaving(true);
-    
-    // Simulate API Call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    console.log("Saved Config to Backend:", config);
-    setHasChanges(false);
-    setSaving(false);
+
+    try {
+      const res = await fetch(`${url}/api/router/config`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(config),
+      });
+
+      if (!res.ok) throw new Error("Failed to save config");
+
+      setHasChanges(false);
+      console.log("Configuration saved successfully");
+    } catch (err) {
+      console.error("Error saving config:", err);
+      alert("Failed to save settings to the router.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return {
     config,
+    devices,
     loading,
     saving,
     hasChanges,
     updateSetting,
     addPortRule,
     removePortRule,
+    toggleBlockDevice,
+    toggleLimitDevice,
     saveChanges,
   };
 };
 
-
-// --- Types ---
 export interface Deployment {
   id: string;
   commit: string;

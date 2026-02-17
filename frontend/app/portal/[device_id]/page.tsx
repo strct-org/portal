@@ -49,13 +49,13 @@ export default function DeviceHub() {
     },
     {
       id: "vpn",
-      title: "Private VPN",
+      title: "VPN",
       description:
         "Secure your internet connection with a personal VPN tunnel.",
       icon: Globe,
       color: "bg-blue-500",
       path: `/portal/${deviceId}/vpn`,
-      status: "inactive" as const,
+      status: "active" as const,
     },
     {
       id: "adblock",
