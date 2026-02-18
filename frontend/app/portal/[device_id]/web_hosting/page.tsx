@@ -52,7 +52,7 @@ export default function HostingDashboard() {
         >
           {/* Header */}
           <button
-            onClick={() => router.push("/portal/dashboard")}
+            onClick={() => router.back()}
             className="group flex items-center gap-2 text-gray-500 hover:text-black mb-6 transition-colors font-medium text-sm"
           >
             <div className="p-1 rounded-full bg-white shadow-sm border border-gray-200 group-hover:border-gray-300">

@@ -159,9 +159,8 @@ export default function RouterDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* Header */}
           <button
-            onClick={() => router.push("/portal/dashboard")}
+            onClick={() => router.back()}
             className="group flex items-center gap-2 text-gray-500 hover:text-black mb-6 transition-colors font-medium text-sm"
           >
             <div className="p-1 rounded-full bg-white shadow-sm border border-gray-200 group-hover:border-gray-300">
@@ -180,7 +179,6 @@ export default function RouterDashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 1. Wi-Fi Configuration */}
             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 col-span-1 lg:col-span-2">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">

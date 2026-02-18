@@ -9,7 +9,7 @@ export interface VPNState {
   is_exit_node: boolean;
   tailscale_ip: string;
   account: string;
-  auth_key_set: boolean;
+  error_message?: string;
 }
 
 export const useDeviceVPNStats = (selectedDeviceId: string | null) => {
@@ -21,7 +21,6 @@ export const useDeviceVPNStats = (selectedDeviceId: string | null) => {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
 
-  // Fetch Status
   const fetchStatus = useCallback(async () => {
     if (!url) return;
     try {
@@ -30,49 +29,25 @@ export const useDeviceVPNStats = (selectedDeviceId: string | null) => {
       });
       if (!res.ok) throw new Error("Failed to fetch VPN status");
       const data = await res.json();
+      console.log(data);
+
       setVpnState(data);
       setError(null);
     } catch (err) {
-      console.warn("VPN Status Fetch Error:", err);
       setError("Device unreachable");
     } finally {
       setLoading(false);
     }
   }, [url]);
 
-  // Initial Load & Polling
   useEffect(() => {
     if (!url) return;
     setLoading(true);
     fetchStatus();
 
-    // Poll every 10 seconds to check connection status
-    const interval = setInterval(fetchStatus, 10000);
+    const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, [fetchStatus, url]);
-
-  // Actions
-  const setupVPN = async (authKey: string) => {
-    if (!url) return;
-    setProcessing(true);
-    try {
-      const res = await fetch(`${url}/api/vpn/setup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auth_key: authKey }),
-      });
-      if (!res.ok) throw new Error("Setup failed");
-
-      // Re-fetch immediately to update UI
-      await new Promise((r) => setTimeout(r, 2000)); // Wait for system to start
-      await fetchStatus();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to setup VPN. Check Auth Key.");
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   const toggleExitNode = async (enable: boolean) => {
     if (!url) return;
@@ -88,11 +63,11 @@ export const useDeviceVPNStats = (selectedDeviceId: string | null) => {
       // Optimistic update
       setVpnState((prev) => (prev ? { ...prev, is_exit_node: enable } : null));
 
-      // Verify after short delay
-      setTimeout(fetchStatus, 1000);
+      // Re-fetch to confirm
+      setTimeout(fetchStatus, 1500);
     } catch (err) {
       console.error(err);
-      alert("Failed to toggle Exit Node.");
+      alert("Failed to toggle VPN mode.");
     } finally {
       setProcessing(false);
     }
@@ -103,7 +78,6 @@ export const useDeviceVPNStats = (selectedDeviceId: string | null) => {
     loading,
     error,
     processing,
-    setupVPN,
     toggleExitNode,
     refetch: fetchStatus,
   };

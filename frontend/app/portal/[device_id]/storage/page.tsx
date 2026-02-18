@@ -232,7 +232,7 @@ export default function Storage() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-[#1d1d1f]">
-                    {device.friendly_name}
+                    File Storage
                   </h1>
                 </div>
               </div>
@@ -260,13 +260,12 @@ export default function Storage() {
                   {isUploading ? "Uploading..." : "Upload File"}
                 </button>
 
-                {/* SHARE */}
-                <button
+                {/* <button
                   onClick={() => setShareModalOpen(true)}
                   className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#ffc233] hover:bg-[#ffcd57] text-[#1d1d1f] font-bold shadow-lg shadow-orange-100 transition-all hover:scale-105"
                 >
                   <Share2 size={18} /> Share Files
-                </button>
+                </button> */}
 
                
               </div>
@@ -666,7 +665,6 @@ function CreateFolderModal({
 }
 
 
-// --- SUB-COMPONENT: Share Modal ---
 function ShareModal({
   onClose,
   deviceName,
