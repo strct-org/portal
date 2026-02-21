@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Activity,
   Wifi,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
   RefreshCw,
   Server,
   Download,
   FileText,
+  Terminal,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart,
   Area,
@@ -41,7 +40,14 @@ interface MonitorStats {
 type ChartType = "latency" | "bandwidth" | "loss";
 type TimeRange = "24h" | "7d" | "30d" | "custom";
 
-export default function NetworkMonitor() {
+// Helper type for jspdf-autotable extension
+type jsPDFWithAutoTable = jsPDF & {
+  lastAutoTable: {
+    finalY: number;
+  };
+};
+
+export default function NetworkMonitorPage() {
   const params = useParams();
   const router = useRouter();
   const { devices, isLoading: portalLoading } = usePortal();
@@ -63,10 +69,10 @@ export default function NetworkMonitor() {
   const [isExporting, setIsExporting] = useState<ChartType | null>(null);
 
   const [history, setHistory] = useState<MonitorStats[]>([]);
-
   const [activeStats, setActiveStats] = useState<MonitorStats | null>(null);
 
   const lastBandwidthRef = useRef<number | null>(null);
+  const initialTestDone = useRef(false);
 
   useEffect(() => {
     if (deviceStats) {
@@ -115,7 +121,6 @@ export default function NetworkMonitor() {
       await fetch(`https://${device.id}.strct.org/api/network/speedtest`, {
         method: "GET",
       });
-      // Refresh to get new data immediately
       refetch();
     } catch (e) {
       alert("Failed to trigger speedtest");
@@ -124,14 +129,13 @@ export default function NetworkMonitor() {
     }
   };
 
-  const initialTestDone = useRef(false);
-
   useEffect(() => {
     if (device && !initialTestDone.current) {
       handleRunSpeedtest();
       initialTestDone.current = true;
     }
-  }, [device]); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [device]);
 
   const fetchDetailedHistory = async (
     range: TimeRange,
@@ -206,7 +210,6 @@ export default function NetworkMonitor() {
       const min = Math.min(...values, 0);
 
       const doc = new jsPDF();
-
       doc.setFontSize(18);
       doc.text("Network Performance Report", 14, 20);
 
@@ -246,7 +249,9 @@ export default function NetworkMonitor() {
         headStyles: { fillColor: [29, 29, 31] },
       });
 
-      doc.text("Detailed Logs", 14, (doc as any).lastAutoTable.finalY + 15);
+      const finalY = (doc as jsPDFWithAutoTable).lastAutoTable.finalY;
+
+      doc.text("Detailed Logs", 14, finalY + 15);
 
       const tableRows = filteredData.map((item) => [
         format(new Date(item.timestamp), "yyyy-MM-dd HH:mm:ss"),
@@ -259,17 +264,17 @@ export default function NetworkMonitor() {
       ]);
 
       autoTable(doc, {
-        startY: (doc as any).lastAutoTable.finalY + 20,
+        startY: finalY + 20,
         head: [["Timestamp", "Value", "Status"]],
         body: tableRows,
         theme: "striped",
         headStyles: {
           fillColor:
             type === "loss"
-              ? [239, 68, 68]
+              ? [248, 113, 113]
               : type === "bandwidth"
-              ? [59, 130, 246]
-              : [34, 197, 94],
+              ? [123, 140, 222]
+              : [74, 222, 128],
         },
       });
 
@@ -282,35 +287,28 @@ export default function NetworkMonitor() {
     }
   };
 
-  const getLatencyColor = (ms: number | null) => {
-    if (!ms) return "text-gray-400";
-    if (ms < 50) return "text-green-500";
-    if (ms < 150) return "text-yellow-500";
-    return "text-red-500";
-  };
-
   const chartConfig = {
     latency: {
-      title: "Latency History",
-      description: "Response time to 8.8.8.8",
+      title: "Latency Over Time",
+      description: "Response time to public DNS (8.8.8.8)",
       dataKey: "latency",
-      color: "#22c55e",
+      color: "#4ade80", // Green
       unit: "ms",
       gradientId: "colorLatency",
     },
     bandwidth: {
-      title: "Download Speed History",
-      description: "Speedtest results over time",
+      title: "Throughput (Speedtest)",
+      description: "Intermittent bandwidth capacity checks",
       dataKey: "bandwidth",
-      color: "#3b82f6",
+      color: "#7b8cde", // Accent Blue
       unit: "Mbps",
       gradientId: "colorBandwidth",
     },
     loss: {
-      title: "Packet Loss History",
-      description: "Percentage of dropped packets over time",
+      title: "Packet Loss",
+      description: "Percentage of dropped ICMP packets",
       dataKey: "loss",
-      color: "#ef4444",
+      color: "#f87171", // Red
       unit: "%",
       gradientId: "colorLoss",
     },
@@ -320,244 +318,186 @@ export default function NetworkMonitor() {
 
   if (portalLoading || !device) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center font-mono">
+        <div className="animate-spin text-[#7b8cde]">
+          <RefreshCw size={24} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f]">
-      <main className="pt-28 px-6 pb-12 max-w-[1200px] mx-auto min-h-screen">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Header */}
-          <button
-            onClick={() => router.push("/portal/dashboard")}
-            className="group flex items-center gap-2 text-gray-500 hover:text-black mb-6 transition-colors font-medium text-sm"
-          >
-            <div className="p-1 rounded-full bg-white shadow-sm border border-gray-200 group-hover:border-gray-300">
-              <ArrowLeft size={14} />
-            </div>
-            Back to Dashboard
-          </button>
-
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <div
+      className="min-h-screen bg-[#080810] text-[#dde1f0]"
+      style={{ fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" }}
+    >
+      {/* Header */}
+      <header className="border-b border-[#151520] sticky top-0 z-40 bg-[#080810]/95 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/portal/dashboard")}
+              className="text-[#444] hover:text-[#888] transition-colors flex items-center gap-1.5 text-sm"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
+            <div className="w-px h-4 bg-[#1a1a2a]" />
             <div>
-              <h1 className="text-3xl font-bold text-[#1d1d1f] flex items-center gap-3">
+              <h1 className="text-sm font-bold tracking-widest uppercase text-[#7b8cde]">
                 Network Monitor
-                {activeStats?.is_down ? (
-                  <span className="px-3 py-1 bg-red-100 text-red-600 text-xs font-bold rounded-full uppercase tracking-wide">
-                    Offline
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase tracking-wide flex items-center gap-1">
-                    <span
-                      className={`w-2 h-2 rounded-full bg-green-500 ${
-                        statsLoading ? "opacity-50" : "animate-pulse"
-                      }`}
-                    />
-                    {statsLoading ? "Updating..." : "Live"}
-                  </span>
-                )}
               </h1>
-              <p className="text-gray-500 mt-1">
-                Real-time latency and bandwidth metrics from{" "}
-                {device.friendly_name}
+              <p className="text-[10px] text-[#333] mt-0.5">
+                {device.friendly_name || "Orange Pi"} · {deviceId?.slice(0, 8)}
               </p>
             </div>
+          </div>
 
+          {/* Live status pill */}
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] uppercase tracking-widest font-bold ${
+              activeStats?.is_down
+                ? "bg-[#1a0a0a] border-[#4a1a1a] text-[#f87171]"
+                : "bg-[#0a1a0a] border-[#1a4a1a] text-[#4ade80]"
+            }`}
+          >
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                activeStats?.is_down
+                  ? "bg-[#f87171]"
+                  : statsLoading
+                  ? "bg-[#4ade80]/50"
+                  : "bg-[#4ade80] animate-pulse"
+              }`}
+            />
+            {activeStats?.is_down
+              ? "Offline"
+              : statsLoading
+              ? "Updating..."
+              : "Live"}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-6 py-10 space-y-8">
+        {/* KPI Cards */}
+        <div>
+          <p className="text-[10px] text-[#333] uppercase tracking-widest mb-4">
+            Select Metric to View
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <KPIButton
+              active={activeChart === "latency"}
+              onClick={() => setActiveChart("latency")}
+              icon={<Activity size={20} />}
+              title="Latency"
+              value={
+                activeStats?.latency ? activeStats.latency.toFixed(1) : "--"
+              }
+              unit="ms"
+              status={
+                activeStats?.latency
+                  ? activeStats.latency < 50
+                    ? "Optimal"
+                    : "Degraded"
+                  : "--"
+              }
+              color="green"
+            />
+            <KPIButton
+              active={activeChart === "bandwidth"}
+              onClick={() => setActiveChart("bandwidth")}
+              icon={<Wifi size={20} />}
+              title="Download Speed"
+              value={
+                activeStats?.bandwidth ? activeStats.bandwidth.toFixed(1) : "--"
+              }
+              unit="Mbps"
+              status={
+                activeStats?.timestamp
+                  ? formatDistanceToNow(new Date(activeStats.timestamp)) + " ago"
+                  : "Unknown"
+              }
+              color="blue"
+            />
+            <KPIButton
+              active={activeChart === "loss"}
+              onClick={() => setActiveChart("loss")}
+              icon={
+                activeStats?.loss && activeStats.loss > 0 ? (
+                  <AlertTriangle size={20} />
+                ) : (
+                  <Server size={20} />
+                )
+              }
+              title="Packet Loss"
+              value={activeStats?.loss ? activeStats.loss.toFixed(1) : "0"}
+              unit="%"
+              status={
+                activeStats?.loss === 0
+                  ? "Zero Loss"
+                  : activeStats?.loss
+                  ? "Warning"
+                  : "--"
+              }
+              color="red"
+            />
+          </div>
+        </div>
+
+        {/* Action Bar (Speedtest + Export) */}
+        <Section title="Diagnostics & Export" sub="Execute manual checks or export historical traffic logs">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <button
               onClick={handleRunSpeedtest}
               disabled={isRunningTest}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#1d1d1f] hover:bg-black text-white font-bold shadow-lg transition-all hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#7b8cde] hover:bg-[#8d9de8] text-[#080810] font-bold py-2.5 px-5 rounded-lg transition-colors text-sm disabled:opacity-50"
             >
               {isRunningTest ? (
-                <RefreshCw size={18} className="animate-spin" />
+                <RefreshCw size={14} className="animate-spin" />
               ) : (
-                <Activity size={18} />
+                <Terminal size={14} />
               )}
-              {isRunningTest ? "Testing..." : "Run Speedtest"}
+              {isRunningTest ? "Running Test..." : "Run Speedtest"}
             </button>
-          </div>
-
-          {/* KPI CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Latency Card */}
-            <button
-              onClick={() => setActiveChart("latency")}
-              className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm relative overflow-hidden group
-                ${
-                  activeChart === "latency"
-                    ? "ring-2 ring-green-500 ring-offset-2"
-                    : "border border-gray-100 hover:border-green-200 hover:shadow-md"
-                }
-              `}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
-                  <Activity size={24} />
-                </div>
-                <div
-                  className={`font-bold text-sm ${getLatencyColor(
-                    activeStats?.latency || 0
-                  )}`}
-                >
-                  {activeStats?.latency
-                    ? activeStats.latency < 50
-                      ? "Good"
-                      : "Poor"
-                    : "--"}
-                </div>
-              </div>
-              <div className="relative z-10">
-                <div className="text-gray-500 text-sm font-medium">Latency</div>
-                <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
-                  {activeStats?.latency ? activeStats.latency.toFixed(1) : "--"}
-                  <span className="text-lg text-gray-400 font-medium ml-1">
-                    ms
-                  </span>
-                </div>
-              </div>
-            </button>
-
-            {/* Bandwidth Card */}
-            <button
-              onClick={() => setActiveChart("bandwidth")}
-              className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm
-                ${
-                  activeChart === "bandwidth"
-                    ? "ring-2 ring-blue-500 ring-offset-2"
-                    : "border border-gray-100 hover:border-blue-200 hover:shadow-md"
-                }
-              `}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                  <Wifi size={24} />
-                </div>
-                <div className="text-xs text-gray-400 font-medium flex items-center gap-1">
-                  <Clock size={12} />
-                  {activeStats?.timestamp
-                    ? formatDistanceToNow(new Date(activeStats.timestamp)) +
-                      " ago"
-                    : "Unknown"}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm font-medium">
-                  Download Speed
-                </div>
-                <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
-                  {activeStats?.bandwidth
-                    ? activeStats.bandwidth.toFixed(1)
-                    : "--"}
-                  <span className="text-lg text-gray-400 font-medium ml-1">
-                    Mbps
-                  </span>
-                </div>
-              </div>
-            </button>
-
-            {/* Packet Loss Card */}
-            <button
-              onClick={() => setActiveChart("loss")}
-              className={`text-left transition-all duration-200 bg-white p-6 rounded-[2rem] shadow-sm
-                ${
-                  activeChart === "loss"
-                    ? "ring-2 ring-red-500 ring-offset-2"
-                    : "border border-gray-100 hover:border-red-200 hover:shadow-md"
-                }
-              `}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                    activeStats?.loss && activeStats.loss > 0
-                      ? "bg-red-50 text-red-500"
-                      : "bg-purple-50 text-purple-600"
-                  }`}
-                >
-                  {activeStats?.loss && activeStats.loss > 0 ? (
-                    <AlertTriangle size={24} />
-                  ) : (
-                    <Server size={24} />
-                  )}
-                </div>
-                {activeStats?.loss === 0 && (
-                  <CheckCircle2 size={20} className="text-green-500" />
-                )}
-              </div>
-              <div>
-                <div className="text-gray-500 text-sm font-medium">
-                  Packet Loss
-                </div>
-                <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
-                  {activeStats?.loss ? activeStats.loss.toFixed(1) : "0"}
-                  <span className="text-lg text-gray-400 font-medium ml-1">
-                    %
-                  </span>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* --- EXPORT HISTORY SECTION --- */}
-          <div className="mb-6 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="p-2 bg-gray-100 rounded-lg text-gray-600">
-                <FileText size={20} />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-[#1d1d1f]">
-                  Export Reports
-                </h4>
-                <p className="text-xs text-gray-500">
-                  Download PDF history logs
-                </p>
-              </div>
-            </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              {/* Time Range Selector */}
-              <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
+              {/* Dropdown */}
+              <div className="flex items-center gap-2">
                 <select
-                  className="bg-transparent text-sm font-medium text-gray-700 px-2 py-1 outline-none cursor-pointer"
                   value={exportRange}
                   onChange={(e) => setExportRange(e.target.value as TimeRange)}
+                  className="bg-[#0a0a14] border border-[#1a1a28] hover:border-[#252535] focus:border-[#7b8cde]/40 rounded-lg px-3 py-2 text-xs font-mono text-[#dde1f0] outline-none transition-colors"
                 >
                   <option value="24h">Last 24 Hours</option>
                   <option value="7d">Last 7 Days</option>
                   <option value="30d">Last 30 Days</option>
-                  <option value="custom">Start From Date</option>
+                  <option value="custom">Custom Date</option>
                 </select>
                 {exportRange === "custom" && (
                   <input
                     type="date"
-                    className="ml-2 bg-white rounded border border-gray-200 text-sm px-2 py-0.5 outline-none"
+                    className="bg-[#0a0a14] border border-[#1a1a28] hover:border-[#252535] focus:border-[#7b8cde]/40 rounded-lg px-2 py-1.5 text-xs font-mono text-[#dde1f0] outline-none transition-colors"
                     onChange={(e) => setCustomStartDate(e.target.value)}
                   />
                 )}
               </div>
 
-              {/* Download Buttons */}
-              <div className="flex gap-2">
+              {/* Export Buttons */}
+              <div className="flex items-center gap-2">
                 <ExportButton
-                  label="Latency"
+                  label="Lat PDF"
                   onClick={() => generatePDF("latency")}
                   isLoading={isExporting === "latency"}
                   color="green"
                 />
                 <ExportButton
-                  label="Speed"
+                  label="Spd PDF"
                   onClick={() => generatePDF("bandwidth")}
                   isLoading={isExporting === "bandwidth"}
                   color="blue"
                 />
                 <ExportButton
-                  label="Loss"
+                  label="Loss PDF"
                   onClick={() => generatePDF("loss")}
                   isLoading={isExporting === "loss"}
                   color="red"
@@ -565,77 +505,54 @@ export default function NetworkMonitor() {
               </div>
             </div>
           </div>
+        </Section>
 
-          {/* MAIN CHART SECTION */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 transition-colors duration-300">
-            <div className="flex justify-between items-center mb-8">
+        {/* Chart Section */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeChart}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="bg-[#0c0c16] border border-[#151522] rounded-2xl p-5"
+          >
+            <div className="mb-6 flex items-start justify-between">
               <div>
-                <motion.h3
-                  key={currentConfig.title}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="text-xl font-bold text-[#1d1d1f]"
-                >
-                  {currentConfig.title}
-                </motion.h3>
-                <motion.p
-                  key={currentConfig.description}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-sm text-gray-500"
-                >
-                  {currentConfig.description}
-                </motion.p>
-              </div>
-
-              {/* Legend */}
-              <div className="flex items-center gap-4 text-xs font-bold text-gray-500">
-                <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold flex items-center gap-2">
                   <span
-                    className="w-3 h-3 rounded-full transition-colors duration-300"
+                    className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: currentConfig.color }}
-                  ></span>
-                  {currentConfig.dataKey === "latency" && "Latency (ms)"}
-                  {currentConfig.dataKey === "bandwidth" && "Speed (Mbps)"}
-                  {currentConfig.dataKey === "loss" && "Loss (%)"}
-                </div>
+                  />
+                  {currentConfig.title}
+                </h3>
+                <p className="text-[10px] text-[#333] font-mono mt-0.5">
+                  {currentConfig.description}
+                </p>
               </div>
             </div>
 
-            <div className="h-[350px] w-full">
+            <div className="h-[350px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={history.length > 0 ? history : []}>
                   <defs>
-                    <linearGradient
-                      id="colorLatency"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                    <linearGradient id="colorLatency" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4ade80" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#4ade80" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient
-                      id="colorBandwidth"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <linearGradient id="colorBandwidth" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#7b8cde" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#7b8cde" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorLoss" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#f87171" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
                     </linearGradient>
                   </defs>
 
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#f0f0f0"
+                    stroke="#151522"
                   />
 
                   <XAxis
@@ -646,16 +563,16 @@ export default function NetworkMonitor() {
                         minute: "2-digit",
                       })
                     }
-                    stroke="#9ca3af"
-                    tick={{ fontSize: 12 }}
+                    stroke="#444"
+                    tick={{ fontSize: 10, fill: "#555" }}
                     tickLine={false}
                     axisLine={false}
                     minTickGap={30}
                   />
 
                   <YAxis
-                    stroke="#9ca3af"
-                    tick={{ fontSize: 12 }}
+                    stroke="#444"
+                    tick={{ fontSize: 10, fill: "#555" }}
                     tickLine={false}
                     axisLine={false}
                     unit={` ${currentConfig.unit}`}
@@ -663,27 +580,29 @@ export default function NetworkMonitor() {
 
                   <Tooltip
                     contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      boxShadow: "0 10px 30px -10px rgba(0,0,0,0.1)",
+                      backgroundColor: "#0c0c16",
+                      borderColor: "#1a1a28",
+                      borderRadius: "12px",
+                      color: "#dde1f0",
+                      fontFamily: "inherit",
+                      fontSize: "12px",
                     }}
-                    labelStyle={{ color: "#6b7280", marginBottom: "0.5rem" }}
-                    itemStyle={{ fontWeight: "bold", color: "#1d1d1f" }}
-                    formatter={(value: any) => [
+                    labelStyle={{ color: "#555", marginBottom: "4px" }}
+                    itemStyle={{ fontWeight: "bold", color: currentConfig.color }}
+                    formatter={(value: number) => [
                       `${Number(value).toFixed(1)} ${currentConfig.unit}`,
                       currentConfig.title.split(" ")[0],
                     ]}
-                    labelFormatter={(label) =>
+                    labelFormatter={(label: string) =>
                       new Date(label).toLocaleTimeString()
                     }
                   />
 
                   <Area
-                    key={activeChart}
                     type="monotone"
                     dataKey={currentConfig.dataKey}
                     stroke={currentConfig.color}
-                    strokeWidth={3}
+                    strokeWidth={2}
                     fillOpacity={1}
                     fill={`url(#${currentConfig.gradientId})`}
                     isAnimationActive={true}
@@ -691,20 +610,112 @@ export default function NetworkMonitor() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+
               {history.length === 0 && !statsLoading && (
-                <div className="flex items-center justify-center h-full w-full absolute top-0 left-0">
-                  <p className="text-gray-400 text-sm">Waiting for data...</p>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-[10px] text-[#444] uppercase tracking-widest">
+                    Awaiting Telemetry...
+                  </p>
                 </div>
               )}
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );
 }
 
-// Sub-component for buttons to keep JSX clean
+
+interface KPIButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  value: string | number;
+  unit: string;
+  status?: string;
+  color: string;
+}
+
+function KPIButton({
+  active,
+  onClick,
+  icon,
+  title,
+  value,
+  unit,
+  status,
+  color,
+}: KPIButtonProps) {
+  const colors: Record<string, string> = {
+    green: "border-[#4ade80]/50 bg-[#0a1a0a] shadow-[0_0_30px_rgba(74,222,128,0.06)]",
+    blue: "border-[#7b8cde]/50 bg-[#0a0c1a] shadow-[0_0_30px_rgba(123,140,222,0.06)]",
+    red: "border-[#f87171]/50 bg-[#1a0a0a] shadow-[0_0_30px_rgba(248,113,113,0.06)]",
+  };
+  
+  const inactive = "border-[#151520] bg-[#0c0c14] hover:border-[#252535]";
+  const activeColor =
+    color === "green"
+      ? "text-[#4ade80]"
+      : color === "blue"
+      ? "text-[#7b8cde]"
+      : "text-[#f87171]";
+
+  return (
+    <button
+      onClick={onClick}
+      className={`text-left p-5 rounded-2xl border transition-all ${
+        active ? colors[color] : inactive
+      }`}
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className={active ? activeColor : "text-[#444]"}>{icon}</div>
+        <div
+          className={`text-[9px] uppercase tracking-widest font-bold ${
+            active ? activeColor : "text-[#444]"
+          }`}
+        >
+          {status}
+        </div>
+      </div>
+      <div>
+        <div className="text-[10px] text-[#555] uppercase tracking-widest mb-1">
+          {title}
+        </div>
+        <div className="text-2xl font-bold text-[#dde1f0]">
+          {value} <span className="text-sm text-[#444] font-normal">{unit}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function Section({
+  title,
+  sub,
+  children,
+}: {
+  title: string;
+  sub: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[#0c0c16] border border-[#151522] rounded-2xl p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="p-2 bg-[#0a0a14] rounded-lg text-[#555]">
+          <FileText size={16} />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-[#dde1f0]">{title}</h3>
+          <p className="text-[10px] text-[#444] font-mono mt-0.5">{sub}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ExportButton({
   label,
   onClick,
@@ -716,25 +727,24 @@ function ExportButton({
   isLoading: boolean;
   color: string;
 }) {
-  const colorClasses = {
-    green: "hover:bg-green-50 hover:text-green-600 border-gray-200",
-    blue: "hover:bg-blue-50 hover:text-blue-600 border-gray-200",
-    red: "hover:bg-red-50 hover:text-red-600 border-gray-200",
+  const accents: Record<string, string> = {
+    green: "hover:bg-[#4ade80]/10 hover:text-[#4ade80] hover:border-[#4ade80]/30",
+    blue: "hover:bg-[#7b8cde]/10 hover:text-[#7b8cde] hover:border-[#7b8cde]/30",
+    red: "hover:bg-[#f87171]/10 hover:text-[#f87171] hover:border-[#f87171]/30",
   };
 
   return (
     <button
       onClick={onClick}
       disabled={isLoading}
-      className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all flex items-center gap-2
-        ${colorClasses[color as keyof typeof colorClasses]}
-        ${isLoading ? "opacity-70 cursor-wait" : "bg-white text-gray-600"}
-      `}
+      className={`px-3 py-2 text-[11px] uppercase tracking-widest font-bold rounded-lg border border-[#1a1a28] transition-all flex items-center gap-2 bg-[#0e0e1a] text-[#888] ${
+        accents[color]
+      } ${isLoading ? "opacity-50 cursor-wait" : ""}`}
     >
       {isLoading ? (
-        <RefreshCw size={14} className="animate-spin" />
+        <RefreshCw size={12} className="animate-spin" />
       ) : (
-        <Download size={14} />
+        <Download size={12} />
       )}
       {label}
     </button>

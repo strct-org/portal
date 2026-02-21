@@ -10,6 +10,8 @@ export interface Device {
   updated_at: string;
 }
 
+
+
 export interface FileMetadata {
   id: number;
   device_id: string;

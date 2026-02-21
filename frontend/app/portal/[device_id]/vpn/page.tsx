@@ -10,15 +10,20 @@ import {
   Smartphone,
   Laptop,
   Power,
-  Home,
-  Loader2,
+  Globe,
+  RefreshCw,
   ShieldCheck,
   AlertCircle,
+  Terminal,
+  X,
+  ChevronRight,
+  Server,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePortal } from "@/providers/PortalProvider";
 import { useDeviceVPNStats } from "@/api/device";
 import { useState } from "react";
+import Image from "next/image";
 
 export default function LocalVPN() {
   const params = useParams();
@@ -45,95 +50,146 @@ export default function LocalVPN() {
 
   if (loading || !device) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center font-mono">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="animate-spin text-[#7b8cde]" size={24} />
+          <span className="text-[10px] text-[#555] uppercase tracking-widest">
+            Establishing Secure Tunnel...
+          </span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f]">
-      <main className="pt-28 px-6 pb-12 max-w-[1200px] mx-auto min-h-screen">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <button
-            onClick={() => router.back()}
-            className="group flex items-center gap-2 text-gray-500 hover:text-black mb-6 transition-colors font-medium text-sm"
-          >
-            <div className="p-1 rounded-full bg-white shadow-sm border border-gray-200 group-hover:border-gray-300">
-              <ArrowLeft size={14} />
+    <div
+      className="min-h-screen bg-[#080810] text-[#dde1f0]"
+      style={{ fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" }}
+    >
+      {/* Top Navigation Bar */}
+      <header className="border-b border-[#151520] sticky top-0 z-40 bg-[#080810]/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push(`/portal/${deviceId}`)}
+              className="text-[#444] hover:text-[#dde1f0] transition-colors flex items-center gap-1.5 text-sm uppercase tracking-widest font-bold"
+            >
+              <ArrowLeft size={14} /> Hub
+            </button>
+            <div className="w-px h-4 bg-[#1a1a2a]" />
+            <div className="flex items-center gap-2">
+              <Terminal size={14} className="text-[#7b8cde]" />
+              <div>
+                <h1 className="text-xs font-bold tracking-widest uppercase text-[#7b8cde]">
+                  {device.friendly_name}
+                </h1>
+                <p className="text-[9px] text-[#555] mt-0.5 uppercase tracking-widest">
+                  VPN Subsystem
+                </p>
+              </div>
             </div>
-            Back to Dashboard
-          </button>
+          </div>
 
-          {/* Hero Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* 1. Control Card */}
-            <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-[#0a1a0a] border-[#1a4a1a] text-[#4ade80] text-[9px] uppercase tracking-widest font-bold">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+              Online
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 pb-6 border-b border-[#151522]">
+            <div>
+              <h2 className="text-xl font-bold text-[#dde1f0] mb-2 flex items-center gap-3">
+                Secure Gateway
+              </h2>
+              <p className="text-[11px] text-[#555] uppercase tracking-widest flex items-center gap-2">
+                <span className="text-[#7b8cde]">
+                  {device.local_ip || "192.168.1.x"}
+                </span>
+                <span className="text-[#333]">/</span>
+                Manage VPN Routing & Access
+              </p>
+            </div>
+          </div>
+
+          {/* Core Controls */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+            {/* Control Card */}
+            <div className="bg-[#0c0c16] rounded-2xl p-6 border border-[#1a1a28] flex flex-col justify-between relative overflow-hidden group">
+              {/* Subtle Background Glow */}
               <div
-                className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full transition-opacity duration-700 ${
-                  isExitNode ? "opacity-100" : "opacity-0"
+                className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl transition-opacity duration-700 pointer-events-none ${
+                  isExitNode
+                    ? "bg-[#4ade80]/5 opacity-100"
+                    : "bg-[#7b8cde]/5 opacity-0"
                 }`}
               />
 
               <div>
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-5">
                   <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
+                    className={`p-2.5 rounded-xl border transition-colors ${
                       isExitNode
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-100 text-gray-400"
+                        ? "bg-[#0a1a0a] border-[#1a4a1a] text-[#4ade80]"
+                        : "bg-[#0a0a14] border-[#1a1a28] text-[#555]"
                     }`}
                   >
-                    <Lock size={24} />
+                    <Lock size={20} />
                   </div>
-                  <h1 className="text-3xl font-bold text-[#1d1d1f]">
-                    Secure Gateway
-                  </h1>
+                  <h3 className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest">
+                    Network Tunnel
+                  </h3>
                 </div>
-                <p className="text-gray-500 leading-relaxed max-w-md">
+                <p className="text-[11px] text-[#555] leading-relaxed mb-6">
                   {isExitNode
-                    ? "Your home network is currently accessible securely. Traffic appears to originate from this device."
-                    : "Enable the VPN to route your phone or laptop traffic through this device securely."}
+                    ? "Subsystem active. Remote traffic is currently being securely routed through this hardware node."
+                    : "Initialize the VPN tunnel to securely route your external traffic through this local device."}
                 </p>
               </div>
 
               {/* Status & Action */}
-              <div className="mt-12">
+              <div className="mt-auto">
                 {hasError ? (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-3">
-                    <AlertCircle size={20} />
-                    <span className="text-sm font-medium">
-                      Error: {vpnState?.error_message}
+                  <div className="bg-[#1a0a0a] border border-[#3a1a1a] text-[#f87171] p-4 rounded-xl flex items-center gap-3">
+                    <AlertCircle size={16} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                      ERR: {vpnState?.error_message}
                     </span>
                   </div>
                 ) : isProvisioning ? (
-                  <div className="bg-blue-50 text-blue-600 p-4 rounded-xl flex items-center gap-3 animate-pulse">
-                    <Loader2 size={20} className="animate-spin" />
-                    <span className="text-sm font-medium">
-                      Provisioning secure connection...
+                  <div className="bg-[#0a0a1a] border border-[#1a1a3a] text-[#7b8cde] p-4 rounded-xl flex items-center gap-3">
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                      Provisioning connection...
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100 relative z-10">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-[#0a0a14] p-4 rounded-xl border border-[#1a1a28] relative z-10 gap-4">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-3 h-3 rounded-full ${
+                        className={`w-2 h-2 rounded-full ${
                           isExitNode
-                            ? "bg-green-500 animate-pulse"
-                            : "bg-orange-400"
+                            ? "bg-[#4ade80] animate-pulse shadow-[0_0_8px_#4ade80]"
+                            : "bg-[#fbbf24]"
                         }`}
                       />
                       <div>
-                        <div className="font-bold text-gray-700">
-                          {isExitNode ? "VPN Active" : "VPN Standby"}
+                        <div className="text-xs font-bold text-[#dde1f0] uppercase tracking-widest">
+                          {isExitNode ? "Tunnel Active" : "Tunnel Standby"}
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-[9px] text-[#555] mt-1 font-mono uppercase tracking-widest">
                           {vpnState?.tailscale_ip
                             ? `IP: ${vpnState.tailscale_ip}`
-                            : "Waiting for IP..."}
+                            : "Awaiting IP Assignment"}
                         </div>
                       </div>
                     </div>
@@ -141,53 +197,60 @@ export default function LocalVPN() {
                     <button
                       onClick={handleToggle}
                       disabled={processing}
-                      className={`px-6 py-2 rounded-xl font-bold text-white transition-all shadow-lg active:scale-95 flex items-center gap-2 ${
+                      className={`px-5 py-2.5 rounded-lg font-bold text-[10px] transition-all flex items-center gap-2 uppercase tracking-widest border ${
                         isExitNode
-                          ? "bg-red-500 hover:bg-red-600 shadow-red-200"
-                          : "bg-[#1d1d1f] hover:bg-black"
+                          ? "bg-[#1a0a0a] border-[#3a1a1a] hover:border-[#f87171]/50 text-[#f87171]"
+                          : "bg-[#0a1a0a] border-[#1a4a1a] hover:border-[#4ade80]/50 text-[#4ade80]"
                       }`}
                     >
                       {processing ? (
-                        <Loader2 className="animate-spin" size={16} />
+                        <RefreshCw className="animate-spin" size={14} />
                       ) : (
-                        <Power size={16} />
+                        <Power size={14} />
                       )}
-                      {isExitNode ? "Stop" : "Start"}
+                      {isExitNode ? "Terminate" : "Initialize"}
                     </button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* 2. Visual Indicator */}
-            <div className="bg-[#1d1d1f] rounded-[2rem] p-8 shadow-xl text-white flex flex-col items-center justify-center relative overflow-hidden text-center">
+            {/* Visual Indicator Map/Node */}
+            <div className="bg-[#0c0c16] rounded-2xl p-6 border border-[#1a1a28] flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[280px]">
+              {/* Radar Rings */}
               {isExitNode && (
                 <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-                  <div className="w-64 h-64 border border-white rounded-full animate-ping absolute" />
-                  <div className="w-48 h-48 border border-white rounded-full animate-ping delay-75 absolute" />
+                  <div className="w-64 h-64 border border-[#4ade80] rounded-full animate-ping absolute opacity-20" />
+                  <div className="w-48 h-48 border border-[#4ade80] rounded-full animate-ping delay-75 absolute opacity-40" />
                 </div>
               )}
 
-              <div className="relative z-10 bg-white/10 backdrop-blur-md p-6 rounded-full mb-6 border border-white/20">
+              <div
+                className={`relative z-10 p-5 rounded-full mb-5 border ${
+                  isExitNode
+                    ? "bg-[#0a1a0a] border-[#1a4a1a] shadow-[0_0_30px_rgba(74,222,128,0.15)]"
+                    : "bg-[#0a0a14] border-[#1a1a28]"
+                }`}
+              >
                 {isExitNode ? (
-                  <ShieldCheck size={40} className="text-green-400" />
+                  <ShieldCheck size={32} className="text-[#4ade80]" />
                 ) : (
-                  <Home size={40} className="text-gray-400" />
+                  <Globe size={32} className="text-[#444]" />
                 )}
               </div>
 
-              <h2 className="text-2xl font-bold mb-2">
-                {isExitNode ? "Tunnel Active" : "Tunnel Inactive"}
+              <h2 className="text-sm font-bold text-[#dde1f0] mb-2 uppercase tracking-widest">
+                {isExitNode ? "Node Routing Engaged" : "Node Offline"}
               </h2>
-              <p className="text-gray-400 text-sm max-w-xs mx-auto">
+              <p className="text-[10px] text-[#555] max-w-[250px] mx-auto uppercase tracking-widest leading-relaxed">
                 {isExitNode
-                  ? "Devices connected to your company network can now route via this node."
-                  : "Start the VPN to secure your connection."}
+                  ? "Authorized devices can now route encrypted traffic via this node."
+                  : "Start the VPN subsystem to secure your external connection."}
               </p>
 
-              <div className="mt-6 flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/10 text-xs font-mono text-blue-200">
-                <MapPin size={12} />
-                {device.local_ip}
+              <div className="mt-6 flex items-center gap-2 px-3 py-1.5 bg-[#0a0a14] rounded-md border border-[#1a1a28] text-[9px] font-mono text-[#7b8cde] uppercase tracking-widest">
+                <MapPin size={10} />
+                LOC: {device.local_ip}
               </div>
             </div>
           </div>
@@ -197,92 +260,132 @@ export default function LocalVPN() {
             className={`transition-all duration-500 ${
               isExitNode
                 ? "opacity-100 translate-y-0"
-                : "opacity-50 blur-sm pointer-events-none"
+                : "opacity-40 grayscale pointer-events-none"
             }`}
           >
-            <h3 className="text-xl font-bold text-[#1d1d1f] mb-6 px-2">
-              Connect Your Device
+            <h3 className="text-xs font-bold text-[#dde1f0] mb-4 flex items-center gap-2 uppercase tracking-widest">
+              <Server size={14} className="text-[#7b8cde]" />
+              Client Interfaces
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Mobile Card */}
+              <div className="group bg-[#0c0c16] p-6 rounded-2xl border border-[#1a1a28] hover:border-[#60a5fa]/40 hover:bg-[#0e0e1a] transition-all flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                    <Smartphone size={28} />
+                  <div className="p-3 bg-[#0a0a14] border border-[#1a1a28] text-[#60a5fa] rounded-xl group-hover:scale-110 transition-transform duration-500">
+                    <Smartphone size={20} />
                   </div>
                   <div>
-                    <div className="font-bold text-[#1d1d1f]">Mobile App</div>
-                    <div className="text-xs text-gray-400">Install Client</div>
+                    <div className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest">
+                      Mobile Client
+                    </div>
+                    <div className="text-[10px] text-[#555] mt-1 uppercase tracking-widest">
+                      iOS / Android
+                    </div>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowQr(true)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-xl font-bold text-sm transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-[#0a0a14] hover:bg-[#1a1a28] border border-[#1a1a28] text-[#dde1f0] rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors flex items-center gap-2"
                 >
-                  <QrCode size={16} /> QR Code
+                  <QrCode size={12} className="text-[#60a5fa]" /> Scan QR
                 </button>
               </div>
 
-              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center justify-between">
+              {/* Desktop Card */}
+              <div className="group bg-[#0c0c16] p-6 rounded-2xl border border-[#1a1a28] hover:border-[#a78bde]/40 hover:bg-[#0e0e1a] transition-all flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
-                    <Laptop size={28} />
+                  <div className="p-3 bg-[#0a0a14] border border-[#1a1a28] text-[#a78bde] rounded-xl group-hover:scale-110 transition-transform duration-500">
+                    <Laptop size={20} />
                   </div>
                   <div>
-                    <div className="font-bold text-[#1d1d1f]">Desktop</div>
-                    <div className="text-xs text-gray-400">Install Client</div>
+                    <div className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest">
+                      Desktop Client
+                    </div>
+                    <div className="text-[10px] text-[#555] mt-1 uppercase tracking-widest">
+                      macOS / Windows / Linux
+                    </div>
                   </div>
                 </div>
                 <a
                   href="https://tailscale.com/download"
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-xl font-bold text-sm transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-[#0a0a14] hover:bg-[#1a1a28] border border-[#1a1a28] text-[#dde1f0] rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors flex items-center gap-2"
                 >
-                  <Download size={16} /> Download
+                  <Download size={12} className="text-[#a78bde]" /> Download
                 </a>
               </div>
             </div>
           </div>
+        </motion.div>
 
-          <AnimatePresence>
-            {showQr && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                  onClick={() => setShowQr(false)}
-                />
-                <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl flex flex-col items-center text-center"
-                >
-                  <h3 className="text-xl font-bold mb-2">Get the App</h3>
-                  <p className="text-sm text-gray-500 mb-6">
-                    Download the app to connect to the company network.
-                  </p>
-                  <div className="w-64 h-64 bg-white border border-gray-100 rounded-xl flex items-center justify-center mb-6">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://tailscale.com/download`}
-                      alt="Download"
-                      className="w-56 h-56"
-                    />
+        {/* QR Code Modal */}
+        <AnimatePresence>
+          {showQr && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-[#080810]/80 backdrop-blur-sm"
+                onClick={() => setShowQr(false)}
+              />
+
+              {/* Modal Content */}
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="relative bg-[#0c0c16] border border-[#151522] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+              >
+                <div className="bg-[#0a0a14] border-b border-[#1a1a28] px-6 py-4 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <QrCode size={16} className="text-[#60a5fa]" />
+                    <h3 className="text-xs font-bold text-[#dde1f0] uppercase tracking-widest">
+                      Client Provisioning
+                    </h3>
                   </div>
                   <button
                     onClick={() => setShowQr(false)}
-                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold text-gray-700 transition-colors"
+                    className="text-[#555] hover:text-[#dde1f0] transition-colors"
                   >
-                    Close
+                    <X size={16} />
                   </button>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                </div>
+
+                <div className="p-8 flex flex-col items-center text-center">
+                  <div className="p-3 bg-white border-4 border-[#1a1a28] rounded-xl mb-6 shadow-[0_0_20px_rgba(96,165,250,0.1)]">
+                    <Image
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://tailscale.com/download"
+                      width={48}
+                      height={48}
+                      alt="Tailscale Logo"
+                    />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#dde1f0] mb-2 uppercase tracking-widest">
+                    Download Client App
+                  </h4>
+                  <p className="text-[10px] text-[#555] uppercase tracking-widest leading-relaxed">
+                    Scan to install the required application and authenticate to
+                    this node.
+                  </p>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-[#1a1a28] bg-[#0a0a14] px-6 py-4 flex justify-center">
+                  <button
+                    onClick={() => setShowQr(false)}
+                    className="w-full px-5 py-2.5 rounded-lg border border-[#1a1a28] bg-[#0e0e1a] hover:border-[#60a5fa]/50 text-[#dde1f0] text-[10px] font-bold uppercase tracking-widest transition-colors"
+                  >
+                    Close Window
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

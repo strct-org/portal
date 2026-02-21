@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { Menu, X, ArrowRight, User } from "lucide-react";
-import { useAuth, useUser } from "@clerk/nextjs";
-import { usePortal } from "@/providers/PortalProvider";
 import Image from "next/image";
+import { useState, useEffect } from "react";
+import { 
+  Menu, 
+  X, 
+  ArrowRight, 
+  User, 
+  Terminal, 
+  ChevronRight,
+} from "lucide-react";
+import {  useUser } from "@clerk/nextjs";
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -24,51 +30,59 @@ export default function Header() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b font-mono ${
           isScrolled
-            ? "bg-white/85 backdrop-blur-xl border-gray-200/60 py-3 shadow-[0_2px_20px_-10px_rgba(0,0,0,0.05)]"
-            : "bg-opacity backdrop-blur-md border-transparent py-5 "
+            ? "bg-[#080810]/95 backdrop-blur-md border-[#1a1a28] py-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+            : "bg-[#080810]/50 backdrop-blur-sm border-transparent py-6"
         }`}
+        style={{ fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" }}
       >
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-10">
-            <Link href="/" className="group flex items-center gap-2.5">
-              <div className="relative w-9 h-9 bg-gray-900 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform duration-300 group-hover:scale-105 group-hover:bg-[#FBC02D]">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  className="w-5 h-5 font-bold"
-                  strokeWidth="3"
-                >
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-12">
+            {/* Logo */}
+            <Link href="/" className="group flex items-center gap-3">
+              <div className="relative w-8 h-8 bg-[#0a0a14] border border-[#1a1a28] rounded-lg flex items-center justify-center text-[#fbbf24] transition-all duration-300 group-hover:border-[#fbbf24]/50 group-hover:bg-[#fbbf24]/10 group-hover:shadow-[0_0_15px_rgba(251,191,36,0.15)]">
+                <Terminal size={16} strokeWidth={2.5} />
               </div>
-              <span className="font-bold text-xl tracking-tight text-gray-900">
-                Strct
+              <span className="font-bold text-sm tracking-widest text-[#dde1f0] uppercase">
+                Strct_
               </span>
             </Link>
 
-            <nav className="hidden md:flex items-center gap-8 text-[15px] font-medium text-gray-600">
+            {/* Desktop Nav */}
+            <nav className="hidden md:flex items-center gap-8">
               {["Overview", "Specs", "Downloads"].map((item) => (
                 <Link
                   key={item}
                   href={item === "Overview" ? "/" : `/${item.toLowerCase()}`}
-                  className="relative hover:text-black transition-colors duration-200 after:content-[''] after:absolute after:left-0 after:-bottom-1 after:w-0 after:h-[2px] after:bg-[#FBC02D] after:transition-all after:duration-300 hover:after:w-full"
+                  className="group relative text-xs font-bold text-[#555] uppercase tracking-widest hover:text-[#dde1f0] transition-colors duration-200 flex items-center gap-1.5"
                 >
+                  <span className="opacity-0 group-hover:opacity-100 text-[#7b8cde] transition-opacity">
+                    &gt;
+                  </span>
                   {item}
                 </Link>
               ))}
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* Auth State */}
             {user && isSignedIn ? (
               <Link
                 href="/portal/dashboard"
-                className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-black px-4 py-2 transition-colors"
+                className="hidden md:flex items-center gap-3 group px-3 py-1.5 rounded-lg border border-transparent hover:border-[#1a1a28] hover:bg-[#0a0a14] transition-all"
               >
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200">
+                <div className="text-right">
+                  <div className="text-[10px] font-bold text-[#dde1f0] uppercase tracking-widest">
+                    {user.fullName || "Operator"}
+                  </div>
+                  <div className="text-[9px] text-[#4ade80] uppercase tracking-widest flex items-center gap-1 justify-end">
+                    <div className="w-1 h-1 rounded-full bg-[#4ade80] animate-pulse" />
+                    Authorized
+                  </div>
+                </div>
+                <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded border border-[#1a1a28] group-hover:border-[#7b8cde]/50 transition-colors">
                   <Image
                     src={user.imageUrl}
                     alt={user.fullName || "User"}
@@ -80,71 +94,81 @@ export default function Header() {
             ) : (
               <Link
                 href="/portal"
-                className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-black px-4 py-2 transition-colors"
+                className="hidden md:flex items-center gap-2 text-[10px] font-bold text-[#555] hover:text-[#dde1f0] uppercase tracking-widest transition-colors px-2"
               >
-                <User size={18} className="stroke-[2.5px]" />
-                Sign In
+                <User size={14} className="text-[#7b8cde]" />
+                Authenticate
               </Link>
             )}
 
-            <div className="hidden md:flex items-center gap-2 bg-[#1d1d1f] text-white text-[14px] font-medium px-6 py-2.5 rounded-full hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-lg shadow-gray-900/10">
-              <Link href="/buy">Buy Now</Link>
-            </div>
+            {/* CTA Button */}
+            <Link
+              href="/buy"
+              className="hidden md:flex items-center gap-2 bg-[#7b8cde] text-[#080810] text-[10px] font-bold px-5 py-2.5 rounded-md hover:bg-[#8d9de8] transition-all shadow-[0_0_15px_rgba(123,140,222,0.15)] uppercase tracking-widest"
+            >
+              Deploy Node
+            </Link>
 
+            {/* Mobile Menu Toggle */}
             <button
-              className="md:hidden p-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+              className="md:hidden p-2 text-[#555] hover:text-[#dde1f0] bg-[#0a0a14] border border-[#1a1a28] rounded-md transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? (
-                <X className="w-6 h-6" />
+                <X className="w-4 h-4" />
               ) : (
-                <Menu className="w-6 h-6" />
+                <Menu className="w-4 h-4" />
               )}
             </button>
           </div>
         </div>
       </header>
 
+      {/* Mobile Menu Overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-white pt-24 px-6 transition-all duration-300 md:hidden ${
+        className={`fixed inset-0 z-40 bg-[#080810]/98 backdrop-blur-xl pt-24 px-6 transition-all duration-300 md:hidden font-mono flex flex-col ${
           mobileMenuOpen
             ? "opacity-100 translate-y-0"
-            : "opacity-0 -translate-y-full pointer-events-none"
+            : "opacity-0 -translate-y-4 pointer-events-none"
         }`}
       >
-        <div className="flex flex-col space-y-6 text-lg font-medium text-gray-900">
-          <Link
-            href="/"
-            onClick={() => setMobileMenuOpen(false)}
-            className="border-b border-gray-100 pb-4"
-          >
-            Overview
-          </Link>
-          <Link
-            href="/specs"
-            onClick={() => setMobileMenuOpen(false)}
-            className="border-b border-gray-100 pb-4"
-          >
-            Specs
-          </Link>
-          <Link
-            href="/downloads"
-            onClick={() => setMobileMenuOpen(false)}
-            className="border-b border-gray-100 pb-4"
-          >
-            Downloads
-          </Link>
+        <div className="flex flex-col space-y-2 flex-1">
+          <div className="text-[10px] text-[#555] uppercase tracking-widest mb-4">
+            System Navigation
+          </div>
+          
+          {[
+            { name: "Overview", path: "/" },
+            { name: "Specs", path: "/specs" },
+            { name: "Downloads", path: "/downloads" }
+          ].map((item) => (
+            <Link
+              key={item.name}
+              href={item.path}
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between p-4 border border-[#1a1a28] rounded-lg bg-[#0c0c16] text-[#dde1f0] text-xs font-bold uppercase tracking-widest active:bg-[#151522]"
+            >
+              {item.name}
+              <ChevronRight size={14} className="text-[#555]" />
+            </Link>
+          ))}
 
-          <div className="pt-4 flex flex-col gap-3">
+          <div className="pt-8 flex flex-col gap-3 mt-auto mb-10">
             <Link
               href="/portal"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gray-100 text-gray-900 font-semibold"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-lg border border-[#1a1a28] bg-[#0a0a14] text-[#dde1f0] text-xs font-bold uppercase tracking-widest active:bg-[#151522]"
             >
-              <User size={18} /> Portal Login
+              <User size={14} className="text-[#7b8cde]" /> 
+              Portal Access
             </Link>
-            <button className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#FBC02D] text-white font-bold shadow-md">
-              Buy Strct <ArrowRight size={18} />
-            </button>
+            <Link
+              href="/buy"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-lg bg-[#7b8cde] text-[#080810] text-xs font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(123,140,222,0.2)]"
+            >
+              Deploy Node <ArrowRight size={14} />
+            </Link>
           </div>
         </div>
       </div>

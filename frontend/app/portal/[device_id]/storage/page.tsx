@@ -19,11 +19,11 @@ import {
   Image as ImageIcon,
   Music,
   Video,
-  Home,
   UploadCloud,
   FolderPlus,
   Trash2,
   AlertTriangle,
+  Terminal,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePortal } from "@/providers/PortalProvider";
@@ -88,7 +88,7 @@ export default function Storage() {
       setFiles(data.files || []);
     } catch (err) {
       console.error(err);
-      setFileError("Could not connect to device. Is it online?");
+      setFileError("Could not connect to node. Connection severed.");
       setFiles([]);
     } finally {
       setLoadingFiles(false);
@@ -128,14 +128,14 @@ export default function Storage() {
       if (!res.ok) throw new Error("Upload failed");
       fetchFiles(); // Refresh list
     } catch (err) {
-      alert("Error uploading file. Check connection.");
+      const error = err as Error;
+      alert(`Error uploading file. Check connection. (${error.message})`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // --- 4. Navigation & Actions ---
   const handleNavigate = (folderName: string) => {
     const newPath =
       currentPath === "/" ? `/${folderName}` : `${currentPath}/${folderName}`;
@@ -149,7 +149,8 @@ export default function Storage() {
   };
 
   const handleDownload = (fileName: string) => {
-    const deviceUrl = `https://${device!.id}.strct.org`;
+    if (!device) return;
+    const deviceUrl = `https://${device.id}.strct.org`;
     const cleanPath = currentPath === "/" ? "" : currentPath;
     const downloadUrl = `${deviceUrl}/files${cleanPath}/${fileName}`;
     window.open(downloadUrl, "_blank");
@@ -157,40 +158,46 @@ export default function Storage() {
 
   const getFileIcon = (name: string, type: string) => {
     if (type === "folder")
-      return <Folder className="text-[#ffc233] fill-[#ffc233]/20" size={24} />;
+      return <Folder className="text-[#7b8cde]" size={20} />;
     const ext = name.split(".").pop()?.toLowerCase();
     if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || ""))
-      return <ImageIcon className="text-purple-500" size={24} />;
+      return <ImageIcon className="text-[#a78bde]" size={20} />;
     if (["mp4", "mov", "mkv"].includes(ext || ""))
-      return <Video className="text-red-500" size={24} />;
+      return <Video className="text-[#f87171]" size={20} />;
     if (["mp3", "wav"].includes(ext || ""))
-      return <Music className="text-pink-500" size={24} />;
+      return <Music className="text-[#f472b6]" size={20} />;
     if (["pdf", "doc", "txt"].includes(ext || ""))
-      return <FileText className="text-blue-500" size={24} />;
-    return <File className="text-gray-400" size={24} />;
+      return <FileText className="text-[#60a5fa]" size={20} />;
+    return <File className="text-[#555]" size={20} />;
   };
 
-  // --- Loading / Error States for Page ---
   if (portalLoading || !devices) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
-        <Loader2 className="animate-spin text-gray-400" size={32} />
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center font-mono">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-[#7b8cde]" size={24} />
+          <span className="text-[10px] text-[#555] uppercase tracking-widest">
+            Establishing Link...
+          </span>
+        </div>
       </div>
     );
   }
 
   if (!device) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] flex flex-col items-center justify-center text-[#1d1d1f]">
-        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-          <HardDrive className="text-gray-400" size={32} />
+      <div className="min-h-screen bg-[#080810] flex flex-col items-center justify-center font-mono">
+        <div className="w-16 h-16 bg-[#1a0a0a] border border-[#f87171]/30 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(248,113,113,0.1)]">
+          <HardDrive className="text-[#f87171]" size={32} />
         </div>
-        <h1 className="text-2xl font-bold mb-2">Device Not Found</h1>
+        <h1 className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest mb-2">
+          Volume Unreachable
+        </h1>
         <button
           onClick={() => router.push("/portal/dashboard")}
-          className="flex items-center gap-2 px-6 py-3 bg-[#1d1d1f] text-white rounded-full font-bold mt-4"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#0a0a14] border border-[#1a1a28] hover:border-[#7b8cde]/40 text-[#dde1f0] rounded-xl font-bold mt-4 text-xs uppercase tracking-widest transition-all"
         >
-          <ArrowLeft size={18} /> Return to Dashboard
+          <ArrowLeft size={14} /> Return to Fleet
         </button>
       </div>
     );
@@ -199,7 +206,10 @@ export default function Storage() {
   const pathParts = currentPath.split("/").filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f]">
+    <div
+      className="min-h-screen bg-[#080810] text-[#dde1f0] font-mono selection:bg-[#7b8cde]/30 selection:text-[#dde1f0]"
+      style={{ fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" }}
+    >
       <input
         type="file"
         ref={fileInputRef}
@@ -207,93 +217,103 @@ export default function Storage() {
         className="hidden"
       />
 
-      <main className="pt-28 px-6 pb-12 max-w-[1200px] mx-auto min-h-screen">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <button
-            onClick={() => router.back()}
-            className="group flex items-center gap-2 text-gray-500 hover:text-black mb-6 transition-colors font-medium text-sm"
-          >
-            <div className="p-1 rounded-full bg-white shadow-sm border border-gray-200 group-hover:border-gray-300">
-              <ArrowLeft size={14} />
+      {/* Header */}
+      <header className="border-b border-[#151520] sticky top-0 z-40 bg-[#080810]/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="text-[#444] hover:text-[#dde1f0] transition-colors flex items-center gap-1.5 text-sm uppercase tracking-widest font-bold"
+            >
+              <ArrowLeft size={14} /> Hub
+            </button>
+            <div className="w-px h-4 bg-[#1a1a2a]" />
+            <div className="flex items-center gap-2">
+              <Terminal size={14} className="text-[#7b8cde]" />
+              <div>
+                <h1 className="text-xs font-bold tracking-widest uppercase text-[#7b8cde]">
+                  Storage
+                </h1>
+                <p className="text-[9px] text-[#555] mt-0.5 uppercase tracking-widest">
+                  {device.friendly_name}
+                </p>
+              </div>
             </div>
-            Back 
-          </button>
+          </div>
+        </div>
+      </header>
 
-          <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 mb-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-[#fffcf0] to-transparent pointer-events-none"></div>
+      <main className="max-w-6xl mx-auto px-6 py-10 min-h-screen space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="space-y-6"
+        >
+          {/* Action Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#151522] pb-6">
+            <div>
+              <h2 className="text-xl font-bold text-[#dde1f0] mb-2 flex items-center gap-3">
+                Volume Mount
+              </h2>
+              <p className="text-[11px] text-[#555] uppercase tracking-widest flex items-center gap-2">
+                <span className="text-[#7b8cde]">{currentPath || "/"}</span>
+                <span className="text-[#333]">/</span>
+                Manage stored data objects
+              </p>
+            </div>
 
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-[#1d1d1f] rounded-2xl flex items-center justify-center shadow-xl shadow-gray-200">
-                  <HardDrive className="text-[#ffc233]" size={36} />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-[#1d1d1f]">
-                    File Storage
-                  </h1>
-                </div>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setCreateFolderOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#0a0a14] border border-[#1a1a28] hover:border-[#7b8cde]/40 text-[#dde1f0] rounded-xl font-bold transition-all text-xs uppercase tracking-widest shadow-sm"
+              >
+                <FolderPlus size={14} className="text-[#7b8cde]" /> MkDir
+              </button>
 
-              <div className="flex flex-wrap gap-3">
-                {/* NEW FOLDER */}
-                <button
-                  onClick={() => setCreateFolderOpen(true)}
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-gray-200 text-[#1d1d1f] font-bold hover:bg-gray-50 transition-all hover:scale-105"
-                >
-                  <FolderPlus size={18} /> New Folder
-                </button>
-
-                {/* UPLOAD */}
-                <button
-                  onClick={handleUploadClick}
-                  disabled={isUploading}
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#1d1d1f] hover:bg-black text-white font-bold shadow-lg transition-all hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isUploading ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <UploadCloud size={18} />
-                  )}
-                  {isUploading ? "Uploading..." : "Upload File"}
-                </button>
-
-                {/* <button
-                  onClick={() => setShareModalOpen(true)}
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#ffc233] hover:bg-[#ffcd57] text-[#1d1d1f] font-bold shadow-lg shadow-orange-100 transition-all hover:scale-105"
-                >
-                  <Share2 size={18} /> Share Files
-                </button> */}
-
-               
-              </div>
+              <button
+                onClick={handleUploadClick}
+                disabled={isUploading}
+                className="flex items-center gap-2 bg-[#7b8cde] hover:bg-[#8d9de8] text-[#080810] px-5 py-2.5 rounded-xl font-bold transition-all text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(123,140,222,0.15)] hover:shadow-[0_0_25px_rgba(123,140,222,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploading ? (
+                  <Loader2 size={14} className="animate-spin text-[#080810]" />
+                ) : (
+                  <UploadCloud size={14} />
+                )}
+                {isUploading ? "Transferring..." : "Upload"}
+              </button>
             </div>
           </div>
 
           {/* FILE BROWSER AREA */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
-            {/* Browser Header / Breadcrumbs */}
-            <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 overflow-x-auto">
+          <div className="bg-[#0c0c16] rounded-2xl border border-[#151522] overflow-hidden min-h-[500px] flex flex-col shadow-2xl relative">
+            {/* Breadcrumb Header */}
+            <div className="px-6 py-4 bg-[#0a0a14] border-b border-[#1a1a28] flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 overflow-x-auto text-[11px] uppercase tracking-widest font-bold text-[#555]">
                 <button
                   onClick={() => setCurrentPath("/")}
-                  className={`p-1.5 rounded-md hover:bg-gray-200 transition-colors ${
-                    currentPath === "/" ? "text-gray-900" : "text-gray-500"
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
+                    currentPath === "/"
+                      ? "text-[#7b8cde] bg-[#7b8cde]/10 border border-[#7b8cde]/20"
+                      : "hover:text-[#dde1f0] hover:bg-[#11111a] border border-transparent"
                   }`}
                 >
-                  <Home size={18} />
+                  root <span className="text-[#333]">/</span>
                 </button>
                 {pathParts.map((part, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-2 whitespace-nowrap"
                   >
-                    <ChevronRight size={14} className="text-gray-300" />
+                    <ChevronRight size={10} className="text-[#333]" />
                     <button
                       onClick={() => handleBreadcrumbClick(index)}
-                      className="font-medium text-sm hover:text-[#ffc233] transition-colors"
+                      className={`px-2 py-1 rounded-md transition-colors ${
+                        index === pathParts.length - 1
+                          ? "text-[#dde1f0]"
+                          : "hover:text-[#dde1f0] hover:bg-[#11111a]"
+                      }`}
                     >
                       {part}
                     </button>
@@ -301,50 +321,55 @@ export default function Storage() {
                 ))}
               </div>
               {isUploading && (
-                <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-                  <Loader2 size={14} className="animate-spin" />
-                  Uploading...
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#7b8cde] animate-pulse">
+                  <Loader2 size={12} className="animate-spin" />
+                  Writing...
                 </div>
               )}
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 p-4">
+            <div className="flex-1 p-5">
               {loadingFiles ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 min-h-[300px]">
-                  <Loader2 className="animate-spin" size={32} />
-                  <span className="text-sm font-medium">Fetching files...</span>
+                <div className="h-full flex flex-col items-center justify-center text-[#555] gap-4 min-h-[350px]">
+                  <Loader2 className="animate-spin text-[#7b8cde]" size={28} />
+                  <span className="text-[10px] uppercase tracking-widest font-bold">
+                    Indexing Files...
+                  </span>
                 </div>
               ) : fileError ? (
-                <div className="h-full flex flex-col items-center justify-center text-red-400 gap-3 min-h-[300px]">
-                  <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center">
-                    <X size={24} />
+                <div className="h-full flex flex-col items-center justify-center text-[#f87171] gap-4 min-h-[350px]">
+                  <div className="w-12 h-12 bg-[#1a0a0a] border border-[#f87171]/30 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(248,113,113,0.1)]">
+                    <AlertTriangle size={24} />
                   </div>
-                  <span className="text-sm font-medium">{fileError}</span>
+                  <span className="text-xs font-bold uppercase tracking-widest">
+                    {fileError}
+                  </span>
                   <button
                     onClick={() => setCurrentPath("/")}
-                    className="text-xs underline text-gray-500 hover:text-black"
+                    className="text-[10px] text-[#888] hover:text-[#dde1f0] border border-[#1a1a28] bg-[#0a0a14] px-4 py-2 rounded-lg transition-colors uppercase tracking-widest"
                   >
-                    Try resetting path
+                    Reinitialize Root
                   </button>
                 </div>
               ) : files.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2 min-h-[300px]">
-                  <Folder size={48} className="opacity-20" />
-                  <span className="text-sm">This folder is empty</span>
-                  <div className="flex gap-2 mt-2">
+                <div className="h-full flex flex-col items-center justify-center text-[#555] gap-3 min-h-[350px]">
+                  <Folder size={40} className="opacity-20 mb-2" />
+                  <span className="text-[10px] uppercase tracking-widest font-bold">
+                    Directory Empty
+                  </span>
+                  <div className="flex gap-4 mt-2">
                     <button
                       onClick={() => setCreateFolderOpen(true)}
-                      className="text-[#ffc233] font-bold text-sm hover:underline"
+                      className="text-[10px] text-[#7b8cde] font-bold uppercase tracking-widest hover:text-[#8d9de8] transition-colors"
                     >
-                      Create Folder
+                      [ MkDir ]
                     </button>
-                    <span className="text-gray-300">or</span>
                     <button
                       onClick={handleUploadClick}
-                      className="text-[#ffc233] font-bold text-sm hover:underline"
+                      className="text-[10px] text-[#7b8cde] font-bold uppercase tracking-widest hover:text-[#8d9de8] transition-colors"
                     >
-                      Upload File
+                      [ Upload ]
                     </button>
                   </div>
                 </div>
@@ -355,29 +380,26 @@ export default function Storage() {
                       key={`${file.name}-${idx}`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      // Remove the onClick from the parent div so clicking buttons doesn't trigger navigation
-                      className="group p-4 rounded-2xl border border-gray-100 hover:border-[#ffc233] hover:bg-[#fffcf0] hover:shadow-md transition-all flex items-center justify-between relative"
+                      transition={{ delay: idx * 0.02 }}
+                      className="group p-4 rounded-xl bg-[#0a0a14] border border-[#1a1a28] hover:border-[#7b8cde]/40 transition-all flex items-center justify-between relative cursor-pointer hover:bg-[#0c0c1a]"
+                      onClick={() =>
+                        file.type === "folder"
+                          ? handleNavigate(file.name)
+                          : handleDownload(file.name)
+                      }
                     >
-                      {/* Clickable Area for Navigation/Download */}
-                      <div
-                        className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer"
-                        onClick={() =>
-                          file.type === "folder"
-                            ? handleNavigate(file.name)
-                            : handleDownload(file.name)
-                        }
-                      >
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-white flex items-center justify-center flex-shrink-0 transition-colors">
+                      {/* Clickable Area */}
+                      <div className="flex items-center gap-3 overflow-hidden flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-[#0c0c16] border border-[#151522] flex items-center justify-center flex-shrink-0 group-hover:border-[#7b8cde]/20 transition-colors">
                           {getFileIcon(file.name, file.type)}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-sm text-gray-800 truncate group-hover:text-black">
+                          <p className="text-sm font-bold text-[#dde1f0] truncate group-hover:text-[#fff]">
                             {file.name}
                           </p>
-                          <p className="text-xs text-gray-400 group-hover:text-gray-500">
+                          <p className="text-[10px] text-[#555] uppercase tracking-widest mt-0.5">
                             {file.type === "folder"
-                              ? "Folder"
+                              ? "DIR"
                               : `${file.size} • ${new Date(
                                   file.modifiedAt
                                 ).toLocaleDateString()}`}
@@ -385,30 +407,28 @@ export default function Storage() {
                         </div>
                       </div>
 
-                      {/* Action Buttons (Hidden until hover) */}
+                      {/* Action Buttons */}
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                        {/* Delete Button */}
                         <button
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevent opening the folder
+                            e.stopPropagation();
                             setItemToDelete(file);
                             setDeleteModalOpen(true);
                           }}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+                          className="w-8 h-8 rounded-lg border border-[#1a1a28] bg-[#0c0c16] flex items-center justify-center text-[#555] hover:border-[#f87171]/50 hover:bg-[#1a0a0a] hover:text-[#f87171] transition-colors"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={12} />
                         </button>
 
-                        {/* Existing Action Button (Download or Enter) */}
                         {file.type === "file" ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDownload(file.name);
                             }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-[#ffc233] hover:text-black transition-colors"
+                            className="w-8 h-8 rounded-lg border border-[#1a1a28] bg-[#0c0c16] flex items-center justify-center text-[#555] hover:border-[#7b8cde]/50 hover:bg-[#0a0c1a] hover:text-[#7b8cde] transition-colors"
                           >
-                            <Download size={16} />
+                            <Download size={12} />
                           </button>
                         ) : (
                           <button
@@ -416,9 +436,9 @@ export default function Storage() {
                               e.stopPropagation();
                               handleNavigate(file.name);
                             }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-[#ffc233] hover:text-black transition-colors"
+                            className="w-8 h-8 rounded-lg border border-[#1a1a28] bg-[#0c0c16] flex items-center justify-center text-[#555] hover:border-[#7b8cde]/50 hover:bg-[#0a0c1a] hover:text-[#7b8cde] transition-colors"
                           >
-                            <ChevronRight size={16} />
+                            <ChevronRight size={12} />
                           </button>
                         )}
                       </div>
@@ -428,49 +448,50 @@ export default function Storage() {
               )}
             </div>
           </div>
-
-          <AnimatePresence>
-            {shareModalOpen && (
-              <ShareModal
-                onClose={() => setShareModalOpen(false)}
-                deviceName={device.friendly_name}
-              />
-            )}
-            {createFolderOpen && device && (
-              <CreateFolderModal
-                onClose={() => setCreateFolderOpen(false)}
-                currentPath={currentPath}
-                deviceId={device.id}
-                onSuccess={() => {
-                  setCreateFolderOpen(false);
-                  fetchFiles();
-                }}
-              />
-            )}
-
-            {deleteModalOpen && itemToDelete && device && (
-              <DeleteModal
-                onClose={() => {
-                  setDeleteModalOpen(false);
-                  setItemToDelete(null);
-                }}
-                item={itemToDelete}
-                currentPath={currentPath}
-                deviceId={device.id}
-                onSuccess={() => {
-                  setDeleteModalOpen(false);
-                  setItemToDelete(null);
-                  fetchFiles();
-                }}
-              />
-            )}
-            
-          </AnimatePresence>
         </motion.div>
       </main>
+
+      {/* Modals */}
+      <AnimatePresence>
+        {shareModalOpen && (
+          <ShareModal
+            onClose={() => setShareModalOpen(false)}
+            deviceName={device.friendly_name}
+          />
+        )}
+        {createFolderOpen && device && (
+          <CreateFolderModal
+            onClose={() => setCreateFolderOpen(false)}
+            currentPath={currentPath}
+            deviceId={device.id}
+            onSuccess={() => {
+              setCreateFolderOpen(false);
+              fetchFiles();
+            }}
+          />
+        )}
+        {deleteModalOpen && itemToDelete && device && (
+          <DeleteModal
+            onClose={() => {
+              setDeleteModalOpen(false);
+              setItemToDelete(null);
+            }}
+            item={itemToDelete}
+            currentPath={currentPath}
+            deviceId={device.id}
+            onSuccess={() => {
+              setDeleteModalOpen(false);
+              setItemToDelete(null);
+              fetchFiles();
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
+// ─── Modals ───────────────────────────────────────────────────────────────────
 
 function DeleteModal({
   onClose,
@@ -490,7 +511,6 @@ function DeleteModal({
   const handleDelete = async () => {
     setLoading(true);
     try {
-      // Construct full path: /current/path/filename
       const fullPath =
         currentPath === "/" ? `/${item.name}` : `${currentPath}/${item.name}`;
 
@@ -498,15 +518,15 @@ function DeleteModal({
         `https://${deviceId}.strct.org/api/delete?path=${encodeURIComponent(
           fullPath
         )}`,
-        {
-          method: "DELETE",
-        }
+        { method: "DELETE" }
       );
 
       if (!res.ok) throw new Error("Failed to delete");
       onSuccess();
     } catch (err) {
-      alert("Error deleting file");
+      const error = err as Error;
+      alert(`Error deleting object: ${error.message}`);
+    } finally {
       setLoading(false);
     }
   };
@@ -517,51 +537,55 @@ function DeleteModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#080810]/80 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center"
+        initial={{ scale: 0.95, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        className="relative bg-[#0c0c16] border border-[#151522] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
       >
-        <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Trash2 size={32} />
+        <div className="bg-[#0a0a14] border-b border-[#1a1a28] px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 text-[#f87171] text-xs font-bold uppercase tracking-widest">
+            <AlertTriangle size={14} /> Confirm Deletion
+          </div>
         </div>
 
-        <h3 className="text-xl font-bold text-gray-900">
-          Delete {item.type === "folder" ? "Folder" : "File"}?
-        </h3>
+        <div className="p-6 text-center">
+          <div className="w-16 h-16 bg-[#1a0a0a] border border-[#f87171]/30 text-[#f87171] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-[0_0_20px_rgba(248,113,113,0.1)]">
+            <Trash2 size={24} />
+          </div>
 
-        <p className="text-gray-500 mt-2 text-sm">
-          Are you sure you want to delete{" "}
-          <span className="font-bold text-gray-800">"{item.name}"</span>?
-          {item.type === "folder" && (
-            <span className="block mt-2 text-red-500 font-medium text-xs bg-red-50 p-2 rounded-lg flex items-center justify-center gap-1">
-              <AlertTriangle size={12} /> This will delete all contents inside.
-            </span>
-          )}
-        </p>
+          <h3 className="text-sm font-bold text-[#dde1f0] mb-2 truncate px-2">
+            Destroy &quot;{item.name}&quot;?
+          </h3>
 
-        <div className="flex gap-3 justify-center mt-8">
-          <button
-            onClick={onClose}
-            className="px-6 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={loading}
-            className="px-6 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-2"
-          >
-            {loading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              "Delete"
+          <p className="text-[11px] text-[#555] leading-relaxed mb-6 px-2">
+            This action is irreversible and will permanently remove the data from the volume.
+            {item.type === "folder" && (
+              <span className="block mt-3 text-[#f87171] border border-[#f87171]/20 bg-[#1a0a0a] p-2 rounded-lg text-[10px] uppercase tracking-widest">
+                Warning: Directory is not empty
+              </span>
             )}
-          </button>
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-[#0a0a14] border border-[#1a1a28] hover:border-[#2a2a3a] hover:bg-[#11111a] text-[#888] hover:text-[#dde1f0] rounded-lg text-xs font-bold uppercase tracking-widest transition-colors"
+            >
+              Abort
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 bg-[#1a0a0a] border border-[#f87171]/50 text-[#f87171] hover:bg-[#f87171] hover:text-[#080810] rounded-lg text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(248,113,113,0.15)] disabled:opacity-50"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Confirm
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
@@ -595,11 +619,12 @@ function CreateFolderModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: currentPath, name: folderName.trim() }),
       });
-      if (res.status === 409) throw new Error("Folder already exists");
-      if (!res.ok) throw new Error("Failed to create folder");
+      if (res.status === 409) throw new Error("Directory already exists");
+      if (!res.ok) throw new Error("Failed to create directory");
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || "Error creating folder");
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message || "Execution error");
     } finally {
       setLoading(false);
     }
@@ -611,51 +636,55 @@ function CreateFolderModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#080810]/80 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl"
+        initial={{ scale: 0.95, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        className="relative bg-[#0c0c16] border border-[#151522] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
       >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold">New Folder</h3>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-black transition-colors"
-          >
-            <X size={18} />
+        <div className="bg-[#0a0a14] border-b border-[#1a1a28] px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 text-[#7b8cde] text-xs font-bold uppercase tracking-widest">
+            <FolderPlus size={14} /> Allocate Directory
+          </div>
+          <button onClick={onClose} className="text-[#555] hover:text-[#dde1f0] transition-colors">
+            <X size={16} />
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="mb-6">
+            <label className="text-[10px] font-bold text-[#555] uppercase tracking-widest block mb-2">
+              Directory Name
+            </label>
             <input
               autoFocus
               type="text"
-              placeholder="Folder Name"
+              placeholder="new_folder"
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc233] font-medium"
+              className="w-full bg-[#0a0a14] border border-[#1a1a28] hover:border-[#252535] focus:border-[#7b8cde]/40 rounded-lg px-3 py-2.5 text-sm font-mono text-[#dde1f0] focus:outline-none transition-colors placeholder-[#2a2a3a]"
             />
-            {error && <p className="text-red-500 text-xs mt-2 ml-1">{error}</p>}
+            {error && <p className="text-[#f87171] text-[10px] mt-2 font-mono">&gt; {error}</p>}
           </div>
-          <div className="flex gap-2 justify-end">
+
+          <div className="flex gap-3 justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-5 py-2.5 bg-[#0a0a14] border border-[#1a1a28] hover:border-[#2a2a3a] hover:bg-[#11111a] text-[#888] hover:text-[#dde1f0] rounded-lg text-xs font-bold uppercase tracking-widest transition-colors"
             >
-              Cancel
+              Abort
             </button>
             <button
               type="submit"
               disabled={loading || !folderName.trim()}
-              className="px-6 py-2 bg-[#1d1d1f] text-white rounded-lg font-bold hover:bg-black disabled:opacity-50 transition-colors flex items-center gap-2"
+              className="px-5 py-2.5 bg-[#7b8cde] text-[#080810] hover:bg-[#8d9de8] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(123,140,222,0.15)]"
             >
-              {loading && <Loader2 size={14} className="animate-spin" />}
-              Create
+              {loading && <Loader2 size={12} className="animate-spin" />}
+              Execute
             </button>
           </div>
         </form>
@@ -663,7 +692,6 @@ function CreateFolderModal({
     </div>
   );
 }
-
 
 function ShareModal({
   onClose,
@@ -690,18 +718,20 @@ function ShareModal({
   if (sent) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-[#080810]/80 backdrop-blur-sm" />
         <motion.div
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          className="relative bg-white rounded-3xl p-10 flex flex-col items-center text-center shadow-2xl"
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="relative bg-[#0c0c16] border border-[#1a4a1a] rounded-2xl p-10 flex flex-col items-center text-center shadow-[0_0_30px_rgba(74,222,128,0.1)]"
         >
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-[#0a1a0a] border border-[#1a4a1a] text-[#4ade80] rounded-full flex items-center justify-center mb-4">
             <Check size={32} />
           </div>
-          <h3 className="text-xl font-bold text-gray-900">Invitation Sent!</h3>
-          <p className="text-gray-500 mt-2">
-            They will receive an email shortly.
+          <h3 className="text-sm font-bold text-[#4ade80] uppercase tracking-widest mb-2">
+            Keys Distributed
+          </h3>
+          <p className="text-[10px] text-[#555] uppercase tracking-widest">
+            Client authorized for remote access.
           </p>
         </motion.div>
       </div>
@@ -714,55 +744,44 @@ function ShareModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#080810]/80 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className="relative w-full max-w-lg bg-[#0c0c16] border border-[#151522] rounded-2xl shadow-2xl overflow-hidden"
       >
-        <div className="bg-gray-50 px-8 py-6 border-b border-gray-100 flex justify-between items-center">
-          <div>
-            <h3 className="text-xl font-bold text-[#1d1d1f]">
-              Share {deviceName}
-            </h3>
-            <p className="text-sm text-gray-500">
-              Invite friends to access files.
-            </p>
+        <div className="bg-[#0a0a14] border-b border-[#1a1a28] px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 text-[#7b8cde] text-xs font-bold uppercase tracking-widest">
+            <Share2 size={14} /> Distribute Access
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 bg-white rounded-full text-gray-400 hover:text-black hover:shadow-md transition-all"
-          >
-            <X size={18} />
+          <button onClick={onClose} className="text-[#555] hover:text-[#dde1f0] transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="p-8">
-          <div className="relative mb-8">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">
-              Find User
+        <div className="p-6">
+          <div className="relative mb-6">
+            <label className="text-[10px] font-bold text-[#555] uppercase tracking-widest mb-2 block">
+              Query Identity
             </label>
             <div className="relative">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                size={20}
-              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#444]" size={16} />
               <input
                 type="text"
-                placeholder="Enter email, username or device ID"
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc233] focus:bg-white transition-all font-medium"
+                placeholder="email, username, or client_id"
+                className="w-full pl-10 pr-4 py-2.5 bg-[#0a0a14] border border-[#1a1a28] hover:border-[#252535] focus:border-[#7b8cde]/40 rounded-lg text-sm font-mono text-[#dde1f0] focus:outline-none transition-colors placeholder-[#2a2a3a]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="space-y-4">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-              Suggested Contacts
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold text-[#555] uppercase tracking-widest">
+              Available Nodes
             </label>
             <div className="space-y-2">
               {FRIENDS.filter((f) =>
@@ -773,35 +792,30 @@ function ShareModal({
                   onClick={() => setSelectedFriend(friend.id)}
                   className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all ${
                     selectedFriend === friend.id
-                      ? "bg-[#fffcf0] border-[#ffc233] ring-1 ring-[#ffc233]"
-                      : "hover:bg-gray-50 border-transparent hover:border-gray-200"
+                      ? "bg-[#0a0c1a] border-[#7b8cde]/50 shadow-[0_0_15px_rgba(123,140,222,0.1)]"
+                      : "bg-[#0a0a14] border-[#1a1a28] hover:border-[#2a2a3a]"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <img
-                      src={friend.avatar}
-                      alt={friend.name}
-                      className="w-10 h-10 rounded-full"
-                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={friend.avatar} alt={friend.name} className="w-10 h-10 rounded-lg border border-[#2a2a3a] grayscale" />
                     <div>
-                      <div className="font-bold text-sm text-[#1d1d1f]">
+                      <div className="font-bold text-xs text-[#dde1f0] uppercase tracking-widest mb-0.5">
                         {friend.name}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-[10px] text-[#555]">
                         {friend.email}
                       </div>
                     </div>
                   </div>
                   <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    className={`w-5 h-5 rounded border flex items-center justify-center ${
                       selectedFriend === friend.id
-                        ? "border-[#ffc233] bg-[#ffc233]"
-                        : "border-gray-200"
+                        ? "border-[#7b8cde] bg-[#7b8cde]/20"
+                        : "border-[#333]"
                     }`}
                   >
-                    {selectedFriend === friend.id && (
-                      <Check size={14} className="text-black" />
-                    )}
+                    {selectedFriend === friend.id && <Check size={12} className="text-[#7b8cde]" />}
                   </div>
                 </div>
               ))}
@@ -809,28 +823,24 @@ function ShareModal({
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+        <div className="border-t border-[#1a1a28] bg-[#0a0a14] px-6 py-4 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+            className="px-5 py-2.5 rounded-lg font-bold text-[#888] hover:text-[#dde1f0] text-xs uppercase tracking-widest transition-colors"
           >
-            Cancel
+            Abort
           </button>
           <button
             onClick={handleSend}
             disabled={!selectedFriend || isSending}
-            className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg ${
+            className={`px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all text-xs uppercase tracking-widest ${
               !selectedFriend
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
-                : "bg-[#1d1d1f] text-white hover:bg-black"
+                ? "bg-[#11111a] text-[#444] border border-[#1a1a28] cursor-not-allowed"
+                : "bg-[#7b8cde] text-[#080810] hover:bg-[#8d9de8] shadow-[0_0_15px_rgba(123,140,222,0.15)]"
             }`}
           >
-            {isSending ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
-            {isSending ? "Sending..." : "Send Invitation"}
+            {isSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            {isSending ? "Authorizing..." : "Grant Access"}
           </button>
         </div>
       </motion.div>

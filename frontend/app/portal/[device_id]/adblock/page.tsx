@@ -11,6 +11,8 @@ import {
   Ban,
   Filter,
   RefreshCw,
+  Terminal,
+  Server
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -23,7 +25,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { usePortal } from "@/providers/PortalProvider";
-import { useDeviceAdBlockerStats } from "@/api.device";
+import { useDeviceAdBlockerStats } from "@/api/device";
 
 export default function AdBlocker() {
   const params = useParams();
@@ -39,8 +41,13 @@ export default function AdBlocker() {
 
   if (portalLoading || !device) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center font-mono">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="animate-spin text-[#f87171]" size={24} />
+          <span className="text-[10px] text-[#555] uppercase tracking-widest">
+            Interfacing with Shield Subsystem...
+          </span>
+        </div>
       </div>
     );
   }
@@ -51,43 +58,74 @@ export default function AdBlocker() {
   const logs = stats?.recent_logs || [];
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] font-sans text-[#1d1d1f]">
-      <main className="pt-28 px-6 pb-12 max-w-[1200px] mx-auto min-h-screen">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Header */}
-          <button
-            onClick={() => router.push("/portal/dashboard")}
-            className="group flex items-center gap-2 text-gray-500 hover:text-black mb-6 transition-colors font-medium text-sm"
-          >
-            <div className="p-1 rounded-full bg-white shadow-sm border border-gray-200 group-hover:border-gray-300">
-              <ArrowLeft size={14} />
+    <div
+      className="min-h-screen bg-[#080810] text-[#dde1f0]"
+      style={{ fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" }}
+    >
+      {/* Top Navigation Bar */}
+      <header className="border-b border-[#151520] sticky top-0 z-40 bg-[#080810]/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push(`/portal/${deviceId}`)}
+              className="text-[#444] hover:text-[#dde1f0] transition-colors flex items-center gap-1.5 text-sm uppercase tracking-widest font-bold"
+            >
+              <ArrowLeft size={14} /> Hub
+            </button>
+            <div className="w-px h-4 bg-[#1a1a2a]" />
+            <div className="flex items-center gap-2">
+              <Terminal size={14} className="text-[#f87171]" />
+              <div>
+                <h1 className="text-xs font-bold tracking-widest uppercase text-[#f87171]">
+                  {device.friendly_name}
+                </h1>
+                <p className="text-[9px] text-[#555] mt-0.5 uppercase tracking-widest">
+                  Ad Blocker Subsystem
+                </p>
+              </div>
             </div>
-            Back to Dashboard
-          </button>
+          </div>
 
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-[#0a1a0a] border-[#1a4a1a] text-[#4ade80] text-[9px] uppercase tracking-widest font-bold">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+              Online
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 pb-6 border-b border-[#151522]">
             <div>
-              <h1 className="text-3xl font-bold text-[#1d1d1f] flex items-center gap-3">
-                Ad Blocker
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-xl font-bold text-[#dde1f0] flex items-center gap-3">
+                  DNS Shield
+                </h2>
                 {loading && !stats ? (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-400 text-xs font-bold rounded-full uppercase tracking-wide">
-                    Connecting...
+                  <span className="px-2 py-0.5 border border-[#333] bg-[#111] text-[#555] text-[9px] font-bold rounded-md uppercase tracking-widest">
+                    Connecting
                   </span>
                 ) : isEnabled ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase tracking-wide flex items-center gap-1">
-                    <ShieldCheck size={12} /> Active
+                  <span className="px-2 py-0.5 border border-[#1a4a1a] bg-[#0a1a0a] text-[#4ade80] text-[9px] font-bold rounded-md uppercase tracking-widest flex items-center gap-1">
+                    <ShieldCheck size={10} /> Active
                   </span>
                 ) : (
-                  <span className="px-3 py-1 bg-gray-200 text-gray-500 text-xs font-bold rounded-full uppercase tracking-wide flex items-center gap-1">
-                    <ShieldAlert size={12} /> Paused
+                  <span className="px-2 py-0.5 border border-[#3a1a1a] bg-[#1a0a0a] text-[#f87171] text-[9px] font-bold rounded-md uppercase tracking-widest flex items-center gap-1">
+                    <ShieldAlert size={10} /> Suspended
                   </span>
                 )}
-              </h1>
-              <p className="text-gray-500 mt-1">
-                Network-wide protection for {device.friendly_name}
+              </div>
+              <p className="text-[11px] text-[#555] uppercase tracking-widest flex items-center gap-2">
+                <span className="text-[#f87171]">{device.local_ip || "192.168.1.x"}</span>
+                <span className="text-[#333]">/</span>
+                Network-wide telemetry & ad mitigation
               </p>
             </div>
 
@@ -95,176 +133,204 @@ export default function AdBlocker() {
             <button
               onClick={toggleBlocker}
               disabled={loading || isToggling}
-              className={`relative px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all hover:scale-105 flex items-center gap-2 ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all border shadow-sm ${
                 isEnabled
-                  ? "bg-[#1d1d1f] hover:bg-black"
-                  : "bg-gray-400 hover:bg-gray-500"
-              } ${isToggling ? "opacity-80 cursor-wait" : ""}`}
+                  ? "bg-[#1a0a0a] border-[#3a1a1a] hover:border-[#f87171]/50 text-[#f87171]"
+                  : "bg-[#0a1a0a] border-[#1a4a1a] hover:border-[#4ade80]/50 text-[#4ade80]"
+              } ${isToggling ? "opacity-50 cursor-wait" : ""}`}
             >
               {isToggling ? (
-                <RefreshCw size={18} className="animate-spin" />
+                <RefreshCw size={14} className="animate-spin" />
               ) : (
-                <Filter size={18} />
+                <Filter size={14} />
               )}
-              {isEnabled ? "Disable Blocking" : "Enable Blocking"}
+              {isEnabled ? "Suspend Shield" : "Initialize Shield"}
             </button>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
             {/* Blocked Ads Card */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 relative overflow-hidden">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center">
-                  <Ban size={24} />
+            <div className="bg-[#0c0c16] p-6 rounded-2xl border border-[#1a1a28] relative overflow-hidden group hover:border-[#f87171]/40 transition-colors">
+              <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#f87171]/5 rounded-full blur-2xl pointer-events-none group-hover:bg-[#f87171]/10 transition-colors" />
+              <div className="flex justify-between items-start mb-5">
+                <div className="p-2.5 bg-[#1a0a0a] border border-[#3a1a1a] text-[#f87171] rounded-xl">
+                  <Ban size={20} />
                 </div>
-                {/* Optional: You could calculate % change if backend provided yesterday's data */}
-                <div className="text-green-500 text-xs font-bold bg-green-50 px-2 py-1 rounded-lg">
+                <div className="text-[#4ade80] text-[9px] font-bold border border-[#1a4a1a] bg-[#0a1a0a] px-2 py-1 rounded uppercase tracking-widest">
                   Live
                 </div>
               </div>
               <div className="relative z-10">
-                <div className="text-gray-500 text-sm font-medium">
-                  Ads Blocked
+                <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest mb-1">
+                  Threats Neutralized
                 </div>
-                <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
+                <div className="text-3xl font-bold text-[#dde1f0]">
                   {stats?.blocked_queries?.toLocaleString() || "0"}
                 </div>
               </div>
             </div>
 
             {/* Total Queries Card */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center">
-                  <Globe size={24} />
+            <div className="bg-[#0c0c16] p-6 rounded-2xl border border-[#1a1a28] hover:border-[#60a5fa]/40 transition-colors">
+              <div className="flex justify-between items-start mb-5">
+                <div className="p-2.5 bg-[#0a0a1a] border border-[#1a1a3a] text-[#60a5fa] rounded-xl">
+                  <Globe size={20} />
                 </div>
               </div>
               <div>
-                <div className="text-gray-500 text-sm font-medium">
-                  Total Queries
+                <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest mb-1">
+                  Total DNS Queries
                 </div>
-                <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
+                <div className="text-3xl font-bold text-[#dde1f0]">
                   {stats?.total_queries?.toLocaleString() || "0"}
                 </div>
               </div>
             </div>
 
             {/* Block Ratio Card */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center">
-                  <Activity size={24} />
+            <div className="bg-[#0c0c16] p-6 rounded-2xl border border-[#1a1a28] hover:border-[#a78bde]/40 transition-colors">
+              <div className="flex justify-between items-start mb-5">
+                <div className="p-2.5 bg-[#0a0a14] border border-[#2a1a3a] text-[#a78bde] rounded-xl">
+                  <Activity size={20} />
                 </div>
               </div>
               <div>
-                <div className="text-gray-500 text-sm font-medium">
-                  Block Ratio
+                <div className="text-[10px] text-[#555] font-bold uppercase tracking-widest mb-1">
+                  Mitigation Ratio
                 </div>
-                <div className="text-4xl font-bold text-[#1d1d1f] mt-1">
+                <div className="text-3xl font-bold text-[#dde1f0]">
                   {stats?.block_ratio ? stats.block_ratio.toFixed(1) : "0"}%
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Chart Section */}
-            <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
-              <h3 className="text-xl font-bold text-[#1d1d1f] mb-2">
-                Traffic Overview
-              </h3>
-              <p className="text-sm text-gray-500 mb-6">
-                Allowed requests vs Blocked ads over time
-              </p>
+            <div className="lg:col-span-2 bg-[#0c0c16] rounded-2xl border border-[#1a1a28] p-6 flex flex-col">
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest flex items-center gap-2">
+                  <Activity size={14} className="text-[#60a5fa]" />
+                  Traffic Telemetry
+                </h3>
+                <p className="text-[10px] text-[#555] mt-1 uppercase tracking-widest">
+                  Allowed requests vs mitigated threats over time
+                </p>
+              </div>
 
-              <div className="h-[300px] w-full">
+              <div className="h-[280px] w-full flex-1">
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} barSize={20}>
+                    <BarChart data={chartData} barSize={16}>
                       <CartesianGrid
                         strokeDasharray="3 3"
                         vertical={false}
-                        stroke="#f0f0f0"
+                        stroke="#1a1a28"
                       />
                       <XAxis
                         dataKey="time"
-                        stroke="#9ca3af"
-                        tick={{ fontSize: 12 }}
+                        stroke="#555"
+                        tick={{ fontSize: 10, fill: '#555', fontFamily: 'monospace' }}
                         axisLine={false}
                         tickLine={false}
+                        dy={10}
                       />
                       <YAxis
-                        stroke="#9ca3af"
-                        tick={{ fontSize: 12 }}
+                        stroke="#555"
+                        tick={{ fontSize: 10, fill: '#555', fontFamily: 'monospace' }}
                         axisLine={false}
                         tickLine={false}
+                        dx={-10}
                       />
                       <Tooltip
-                        cursor={{ fill: "#f9fafb" }}
+                        cursor={{ fill: "#0e0e1a" }}
                         contentStyle={{
+                          backgroundColor: "#0a0a14",
+                          border: "1px solid #1a1a28",
                           borderRadius: "12px",
-                          border: "none",
-                          boxShadow: "0 10px 30px -10px rgba(0,0,0,0.1)",
+                          color: "#dde1f0",
+                          fontFamily: "monospace",
+                          fontSize: "12px",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em"
                         }}
+                        itemStyle={{ color: "#dde1f0" }}
                       />
                       <Bar
                         dataKey="total"
                         name="Total Queries"
                         stackId="a"
-                        fill="#e5e7eb"
+                        fill="#1a1a28"
                         radius={[0, 0, 4, 4]}
                       />
                       <Bar
                         dataKey="blocked"
-                        name="Ads Blocked"
+                        name="Threats Mitigated"
                         stackId="a"
-                        fill="#ef4444"
+                        fill="#f87171"
                         radius={[4, 4, 0, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                    {loading
-                      ? "Loading chart data..."
-                      : "No traffic data available yet"}
+                  <div className="w-full h-full flex flex-col items-center justify-center text-[#555] text-[10px] uppercase tracking-widest border border-dashed border-[#1a1a28] rounded-xl">
+                    {loading ? (
+                      <>
+                        <RefreshCw className="animate-spin text-[#7b8cde] mb-2" size={16} />
+                        Syncing Telemetry...
+                      </>
+                    ) : (
+                      "Insufficient Data Matrix"
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Recent Logs Section */}
-            <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 flex flex-col">
-              <h3 className="text-xl font-bold text-[#1d1d1f] mb-6">
-                Recent Blocks
-              </h3>
-              <div className="space-y-4 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+            <div className="bg-[#0c0c16] rounded-2xl border border-[#1a1a28] p-6 flex flex-col">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest flex items-center gap-2">
+                    <Server size={14} className="text-[#f87171]" />
+                    Incident Logs
+                  </h3>
+                  <p className="text-[10px] text-[#555] mt-1 uppercase tracking-widest">
+                    Recently blocked domains
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2 flex-1 overflow-y-auto max-h-[280px] pr-1 scrollbar-thin scrollbar-thumb-[#1a1a28] scrollbar-track-transparent">
                 {logs.length > 0 ? (
                   logs.map((log) => (
                     <div
                       key={log.id}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100"
+                      className="flex items-center gap-3 p-3 rounded-xl bg-[#0a0a14] border border-[#1a1a28] hover:border-[#f87171]/30 transition-colors"
                     >
-                      <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 text-red-500">
-                        <Shield size={16} />
+                      <div className="p-2 rounded-lg bg-[#1a0a0a] border border-[#3a1a1a] flex-shrink-0 text-[#f87171]">
+                        <Shield size={12} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-bold text-gray-900 truncate">
+                        <div className="text-[11px] font-bold text-[#dde1f0] truncate">
                           {log.domain}
                         </div>
-                        <div className="text-xs text-gray-400 flex justify-between">
-                          <span>{log.source || "Unknown"}</span>
-                          <span>{log.time}</span>
+                        <div className="text-[9px] text-[#555] flex justify-between uppercase tracking-widest mt-1">
+                          <span>{log.source || "SRC_UNKNOWN"}</span>
+                          <span className="text-[#7b8cde]">{log.time}</span>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-gray-400 py-10 text-sm">
-                    {loading
-                      ? "Loading logs..."
-                      : "No threats blocked recently"}
+                  <div className="h-full flex flex-col items-center justify-center text-center text-[#555] text-[10px] uppercase tracking-widest border border-dashed border-[#1a1a28] rounded-xl py-10">
+                    {loading ? (
+                      <RefreshCw className="animate-spin text-[#7b8cde] mb-2" size={16} />
+                    ) : (
+                      <ShieldCheck size={20} className="text-[#4ade80] mb-2 opacity-50" />
+                    )}
+                    {loading ? "Parsing Logs..." : "Zero Threats Detected"}
                   </div>
                 )}
               </div>

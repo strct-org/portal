@@ -1,21 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Terminal, ShieldCheck, ChevronRight, Server, Activity, Cpu } from "lucide-react";
+
+// Assuming these imported components will also be adapted to the dark theme eventually,
+// we will wrap them in dark-themed containers for now.
 import FAQ from "@/components/sections/faq";
 import { ProductComparison } from "@/components/sections/comparison";
 import { Visulas } from "@/components/sections/visula_images";
 import Why from "@/components/sections/why";
-import Link from "next/link";
-import { motion } from "framer-motion";
 
 const easeCustom = [0.25, 0.1, 0.25, 1];
 
 const fadeInUp = {
-  hidden: { opacity: 0, y: 60 },
+  hidden: { opacity: 0, y: 40 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 1.0, ease: easeCustom as any },
+    transition: { duration: 0.8, ease: easeCustom as any },
   },
 };
 
@@ -25,21 +29,20 @@ const staggerContainer = {
     opacity: 1,
     transition: {
       staggerChildren: 0.15,
-      delayChildren: 0.2
+      delayChildren: 0.1
     }
   }
 };
 
-const imagePop = {
-  hidden: { opacity: 0, scale: 0.9, y: 40 },
+const nodePop = {
+  hidden: { opacity: 0, scale: 0.95, y: 30 },
   visible: {
     opacity: 1,
     scale: 1,
     y: 0,
-    transition: { duration: 1.2, ease: easeCustom as any },
+    transition: { duration: 1.0, ease: easeCustom as any },
   },
 };
-
 
 const SectionWrapper = ({
   children,
@@ -51,9 +54,10 @@ const SectionWrapper = ({
   <motion.div
     initial="hidden"
     whileInView="visible"
-    viewport={{ once: true, margin: "-100px" }} // Triggers when 100px into view
-    transition={{ delay, duration: 0.8, ease: easeCustom as any }}
+    viewport={{ once: true, margin: "-50px" }}
+    transition={{ delay, duration: 0.6, ease: easeCustom as any }}
     variants={fadeInUp}
+    className="relative z-10"
   >
     {children}
   </motion.div>
@@ -61,179 +65,235 @@ const SectionWrapper = ({
 
 export default function Home() {
   const [loaded, setLoaded] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => setLoaded(true), []);
 
   return (
     <main
-      className={`font-sans antialiased text-[#1d1d1f] bg-[#e3e1db] min-h-screen transition-opacity duration-700 ${
+      className={`font-mono antialiased text-[#dde1f0] bg-[#080810] min-h-screen transition-opacity duration-700 ${
         loaded ? "opacity-100" : "opacity-0"
       }`}
+      style={{ fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" }}
     >
-      <section className="relative pt-32 pb-0 md:pt-32 lg:pt-40 overflow-hidden min-h-[90vh] flex flex-col justify-between">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#ebe9e4] via-[#e3e1db] to-[#d6d4ce] -z-20"></div>
-        <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-[#dcdad5] to-transparent opacity-50 -z-10 blur-3xl"></div>
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-0 md:pt-40 lg:pt-48 overflow-hidden min-h-[90vh] flex flex-col justify-between border-b border-[#1a1a28]">
+        
+        {/* Cyberpunk Grid Background */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#151522_1px,transparent_1px),linear-gradient(to_bottom,#151522_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-40 -z-20" />
+        
+        {/* Glow Effects */}
+        <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-[#7b8cde]/10 blur-[120px] rounded-full pointer-events-none -z-10" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[#4ade80]/5 blur-[100px] rounded-full pointer-events-none -z-10" />
 
-        <div className="max-w-[1400px] mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-10">
+        <div className="max-w-6xl mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-10">
+          
+          {/* Text Content */}
           <motion.div
-            className="lg:col-span-5 flex flex-col justify-center lg:block text-center lg:text-left pt-10"
+            className="lg:col-span-6 flex flex-col justify-center text-left pt-10"
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
           >
-            <motion.span
-              variants={fadeInUp}
-              className="text-2xl text-[#555] font-medium block mb-3"
-            >
-              BeeStation
-            </motion.span>
+            <motion.div variants={fadeInUp} className="flex items-center gap-2 mb-6">
+              <Terminal size={14} className="text-[#fbbf24]" />
+              <span className="text-xs font-bold text-[#fbbf24] uppercase tracking-widest">
+                // System Initialization
+              </span>
+            </motion.div>
 
             <motion.h1
               variants={fadeInUp}
-              className="text-5xl md:text-6xl lg:text-[4.5rem] font-bold leading-[1.1] tracking-tight mb-10 text-[#24292f]"
+              className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight mb-8 text-[#dde1f0] uppercase"
             >
-              Create your own cloud <br />
-              in minutes
+              Deploy Your <br />
+              <span className="text-[#7b8cde] relative inline-block">
+                Local Data Node
+                <span className="absolute -bottom-2 left-0 w-full h-1 bg-[#7b8cde]/30 rounded-full" />
+              </span>
             </motion.h1>
+
+            <motion.p variants={fadeInUp} className="text-[#888] text-sm md:text-base mb-10 max-w-lg leading-relaxed">
+              Bypass public clouds. Establish a secure, localized infrastructure for file storage, network routing, and telemetry mitigation in minutes.
+            </motion.p>
 
             <motion.div
               variants={fadeInUp}
-              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-16"
+              className="flex flex-col sm:flex-row gap-4 justify-start items-center mb-16"
             >
               <Link
                 href="/buy"
-                className="bg-[#ffc233] text-[#1d1d1f] px-10 py-3.5 text-center rounded-full font-semibold text-[17px] hover:bg-[#ecc04d] transition-colors shadow-sm min-w-[140px]"
+                className="w-full sm:w-auto bg-[#7b8cde] text-[#080810] px-8 py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#8d9de8] transition-all shadow-[0_0_20px_rgba(123,140,222,0.2)] flex items-center justify-center gap-2"
               >
-                Buy
+                <Cpu size={16} /> Deploy Node
               </Link>
               <Link
                 href="/portal"
-                className="bg-transparent border border-[#888] text-[#1d1d1f] px-8 py-3.5 text-center rounded-full font-medium text-[17px] hover:bg-black/5 transition-colors min-w-[140px]"
+                className="w-full sm:w-auto bg-[#0a0a14] border border-[#1a1a28] text-[#dde1f0] px-8 py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#0e0e1a] hover:border-[#555] transition-all flex items-center justify-center gap-2"
               >
-                Sign In
+                <Server size={16} className="text-[#555]" /> Portal Access
               </Link>
             </motion.div>
 
+            {/* Promo Badge */}
             <motion.div
               variants={fadeInUp}
-              className="bg-[#f0efed]/80 backdrop-blur-md border border-white/40 p-5 rounded-xl inline-block max-w-xs text-left shadow-sm"
+              className="bg-[#0a0a14] border border-[#1a1a28] p-4 rounded-xl inline-flex flex-col max-w-xs shadow-sm"
             >
-              <div className="text-[#002855] font-bold text-lg mb-1 flex items-center gap-1">
-                Acronis{" "}
-                <span className="font-normal text-[#444]">True Image</span>
+              <div className="text-[#4ade80] font-bold text-[11px] mb-1.5 flex items-center gap-2 uppercase tracking-widest">
+                <ShieldCheck size={14} />
+                E2E Encryption Protocol
               </div>
-              <p className="text-[#002855] text-sm font-medium">
-                Three-year protection included
+              <p className="text-[#555] text-[10px] uppercase tracking-widest">
+                Military-grade tunneling pre-configured on all nodes.
               </p>
             </motion.div>
           </motion.div>
 
-          <div className="lg:col-span-7 relative h-[600px] lg:h-auto flex items-end justify-center lg:justify-end gap-8 pb-10">
+          {/* Visual Content (Hardware Nodes) */}
+          <div className="lg:col-span-6 relative h-[500px] lg:h-auto flex items-end justify-center lg:justify-end gap-6 pb-10">
+            
+            {/* Base Node */}
             <motion.div
               className="relative z-20 flex flex-col items-center"
               initial="hidden"
               animate="visible"
-              variants={imagePop}
-              custom={1} // Used if we wanted dynamic delay based on index
+              variants={nodePop}
+              custom={1}
             >
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.8 }}
-                className="absolute -top-16 left-0 bg-transparent border border-gray-500 text-gray-700 text-xs font-semibold px-2 py-1 rounded-[4px]"
+                className="absolute -top-12 left-0 bg-[#0a0a14] border border-[#1a1a28] text-[#dde1f0] text-[9px] font-bold px-3 py-1.5 rounded uppercase tracking-widest shadow-xl flex items-center gap-2"
               >
-                BeeStation
+                <div className="w-1.5 h-1.5 rounded-full bg-[#fbbf24] animate-pulse" />
+                Strct_Base
               </motion.div>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 1, type: "spring" }}
-                className="absolute -top-10 left-4 w-1.5 h-1.5 bg-red-500 rounded-full"
-              ></motion.div>
 
-              <div className="w-32 md:w-44 h-52 md:h-64 bg-gradient-to-r from-[#2a2a2c] to-[#1c1c1e] rounded-lg shadow-2xl flex flex-col items-center justify-end pb-4 relative border-r border-white/10">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20">
-                  <div className="w-8 h-8 border-2 border-white rounded rotate-45"></div>
+              {/* Server Chassis */}
+              <div className="w-32 md:w-44 h-52 md:h-64 bg-[#0c0c16] rounded-xl border border-[#1a1a28] shadow-2xl flex flex-col items-center justify-between py-6 relative overflow-hidden group hover:border-[#fbbf24]/30 transition-colors">
+                {/* Vents */}
+                <div className="w-full px-4 space-y-1">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-0.5 w-full bg-[#151522] rounded-full" />
+                  ))}
                 </div>
-                <div className="w-1 h-1 bg-white rounded-full opacity-80 shadow-[0_0_10px_white]"></div>
-              </div>
-
-              <div className="w-40 md:w-52 h-32 bg-[#dcdad5] rounded-t-[50%] -mt-6 shadow-[inset_0_10px_20px_rgba(0,0,0,0.05)] relative -z-10">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#d1cfc9] rounded-t-[50%]"></div>
+                {/* Indicator LED */}
+                <div className="flex items-center gap-2 mt-auto">
+                  <div className="w-1.5 h-1.5 bg-[#fbbf24] rounded-full shadow-[0_0_8px_#fbbf24]" />
+                  <div className="text-[8px] text-[#555] uppercase tracking-widest font-bold">STBY</div>
+                </div>
+                {/* Side highlight */}
+                <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-transparent via-[#ffffff10] to-transparent" />
               </div>
             </motion.div>
 
+            {/* Pro Node */}
             <motion.div
               className="relative z-10 flex flex-col items-center mb-10 md:mb-0"
               initial="hidden"
               animate="visible"
-              variants={imagePop}
-              transition={{
-                delay: 0.3,
-                duration: 1.2,
-                ease: easeCustom as any,
-              }}
+              variants={nodePop}
+              transition={{ delay: 0.3, duration: 1.0, ease: easeCustom as any }}
             >
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.1 }}
-                className="absolute -top-12 left-0 bg-transparent border border-gray-500 text-gray-700 text-xs font-semibold px-2 py-1 rounded-[4px]"
+                className="absolute -top-16 left-0 bg-[#0a0a14] border border-[#1a4a1a] text-[#4ade80] text-[9px] font-bold px-3 py-1.5 rounded uppercase tracking-widest shadow-[0_0_20px_rgba(74,222,128,0.1)] flex items-center gap-2"
               >
-                BeeStation Plus
+                <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+                Strct_Pro
               </motion.div>
 
-              <div className="w-40 md:w-56 h-64 md:h-80 bg-gradient-to-r from-[#5a5a5e] to-[#454547] rounded-lg shadow-2xl flex flex-col items-center justify-end pb-6 relative border-r border-white/10">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20">
-                  <div className="w-10 h-10 border-2 border-white rounded rotate-45"></div>
+              {/* Server Chassis */}
+              <div className="w-40 md:w-56 h-64 md:h-80 bg-[#080810] rounded-xl border border-[#1a1a28] shadow-2xl flex flex-col items-center justify-between py-6 relative overflow-hidden group hover:border-[#4ade80]/30 transition-colors">
+                {/* Internal Glow */}
+                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-20 h-20 bg-[#7b8cde]/5 rounded-full blur-xl" />
+                
+                {/* Vents */}
+                <div className="w-full px-5 space-y-1.5">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="h-0.5 w-full bg-[#151522] rounded-full" />
+                  ))}
                 </div>
-                <div className="w-1 h-1 bg-white rounded-full opacity-80 shadow-[0_0_10px_white]"></div>
-              </div>
+                
+                {/* Digital Display / Indicators */}
+                <div className="mt-auto w-full px-5 flex items-center justify-between">
+                  <div className="flex gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-[#4ade80] rounded-full shadow-[0_0_8px_#4ade80] animate-pulse" />
+                    <div className="w-1.5 h-1.5 bg-[#60a5fa] rounded-full" />
+                  </div>
+                  <div className="text-[8px] font-mono text-[#7b8cde] border border-[#1a1a28] px-1.5 py-0.5 rounded bg-[#0a0a14]">
+                    ACTV
+                  </div>
+                </div>
 
-              <div className="w-48 md:w-72 h-40 bg-[#dcdad5] rounded-t-[50%] -mt-8 shadow-[inset_0_10px_20px_rgba(0,0,0,0.05)] relative -z-10">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#d1cfc9] rounded-t-[50%]"></div>
+                <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-transparent via-[#ffffff15] to-transparent" />
               </div>
             </motion.div>
           </div>
         </div>
 
+        {/* Tab Navigation */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.2, duration: 0.8 }}
-          className="w-full max-w-[1400px] mx-auto px-6 mt-auto"
+          className="w-full max-w-6xl mx-auto px-6 mt-auto relative z-20"
         >
-          <div className="flex gap-8 pb-4 border-b border-transparent">
+          <div className="flex gap-8 pb-4">
             <div className="flex flex-col gap-2 cursor-pointer group">
-              <span className="text-[#1d1d1f] font-bold text-lg">Features</span>
-              <div className="h-[3px] w-full bg-[#ffc233] rounded-full"></div>
+              <span className="text-[#dde1f0] font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                <Activity size={14} className="text-[#7b8cde]" /> System_Modules
+              </span>
+              <div className="h-[2px] w-full bg-[#7b8cde] shadow-[0_0_10px_#7b8cde]" />
             </div>
             <div className="flex flex-col gap-2 cursor-pointer group">
-              <span className="text-gray-500 font-bold text-lg group-hover:text-[#1d1d1f] transition-colors">
-                Specs
+              <span className="text-[#555] font-bold text-xs uppercase tracking-widest group-hover:text-[#dde1f0] transition-colors flex items-center gap-2">
+                <Server size={14} /> Tech_Specs
               </span>
-              <div className="h-[3px] w-full bg-transparent group-hover:bg-gray-300 rounded-full transition-colors"></div>
+              <div className="h-[2px] w-full bg-transparent group-hover:bg-[#1a1a28] transition-colors" />
             </div>
           </div>
         </motion.div>
       </section>
 
-      <SectionWrapper>
-        <ProductComparison />
-      </SectionWrapper>
+      {/* 
+        Below we render the imported sections.
+        Wrapping them in styled containers to try and force dark-mode compliance
+        if they rely on inherited text/background colors.
+      */}
 
-      <SectionWrapper delay={0.2}>
-        <Why />
-      </SectionWrapper>
+      <div className="bg-[#080810] text-[#dde1f0] border-b border-[#1a1a28]">
+        <SectionWrapper>
+          <ProductComparison />
+        </SectionWrapper>
+      </div>
 
-      <SectionWrapper>
-        <Visulas />
-      </SectionWrapper>
+      <div className="bg-[#0a0a14] text-[#dde1f0] border-b border-[#1a1a28]">
+        <SectionWrapper delay={0.2}>
+          <Why />
+        </SectionWrapper>
+      </div>
 
-      <div className="bg-white ">
-        <div className="max-w-[1000px] mx-auto px-6 py-8">
+      <div className="bg-[#080810] text-[#dde1f0] border-b border-[#1a1a28]">
+        <SectionWrapper>
+          <Visulas />
+        </SectionWrapper>
+      </div>
+
+      <div className="bg-[#0c0c16] text-[#dde1f0]">
+        <div className="max-w-4xl mx-auto px-6 py-16">
           <SectionWrapper>
+            <div className="mb-10 text-center">
+              <h2 className="text-xl font-bold text-[#dde1f0] uppercase tracking-widest mb-2">
+                Knowledge Base
+              </h2>
+              <p className="text-[11px] text-[#555] uppercase tracking-widest">
+                Frequently Queried Datapoints
+              </p>
+            </div>
             <FAQ />
           </SectionWrapper>
         </div>
