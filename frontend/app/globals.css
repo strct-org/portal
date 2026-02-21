@@ -1,17 +1,34 @@
 @import "tailwindcss";
+/* @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap'); */
 
 @theme {
-  --color-syno-orange: #e08e00;
-  --color-syno-hoverOrange: #b87500;
-  --color-syno-dark: #1d1d1f;
-  --color-syno-medium: #444446;
-  --color-syno-light: #f5f5f7;
-  --color-syno-border: #d2d2d7;
+  /* Base Architecture */
+  --color-strct-bg: #080810;
+  --color-strct-panel: #0c0c16;
+  --color-strct-panel-hover: #0e0e1a;
+  --color-strct-surface: #0a0a14;
+  
+  /* Borders & Grid */
+  --color-strct-border: #1a1a28;
+  --color-strct-border-muted: #151522;
+  
+  /* Typography */
+  --color-strct-text: #dde1f0;
+  --color-strct-text-muted: #555555;
+  --color-strct-text-dim: #444444;
+  
+  /* Cyberpunk Accents */
+  --color-strct-blue: #7b8cde;
+  --color-strct-green: #4ade80;
+  --color-strct-amber: #fbbf24;
+  --color-strct-red: #f87171;
+  --color-strct-purple: #a78bde;
+  --color-strct-pink: #f472b6;
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #1d1d1f;
+  --background: #080810;
+  --foreground: #080810;
 }
 
 /* 1. Target both HTML and BODY */
@@ -22,6 +39,8 @@ body {
   scrollbar-width: none;
   /* IE and Edge */
   -ms-overflow-style: none;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* 2. Target Webkit (Chrome, Safari) specifically on HTML and BODY */
@@ -31,10 +50,42 @@ body::-webkit-scrollbar {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  /* Strict monospace enforcement */
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Terminal Selection Highlight */
+::selection {
+  background: #7b8cde;
+  color: #080810;
+}
+::-moz-selection {
+  background: #7b8cde;
+  color: #080810;
+}
+
+/* Custom Terminal Scrollbar for specific overflow containers */
+.custom-scrollbar::-webkit-scrollbar,
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+  display: block; /* Overrides the global none for specific containers */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #1a1a28;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #7b8cde;
 }
