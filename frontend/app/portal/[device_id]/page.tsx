@@ -188,11 +188,11 @@ export default function DeviceHub() {
               <h2 className="text-xl font-bold text-[#dde1f0] mb-2 flex items-center gap-3">
                 Active Modules
               </h2>
-              <p className="text-[11px] text-[#555] uppercase tracking-widest flex items-center gap-2">
+              {/* <p className="text-[11px] text-[#555] uppercase tracking-widest flex items-center gap-2">
                 <span className="text-[#7b8cde]">{device.local_ip || "192.168.1.x"}</span> 
                 <span className="text-[#333]">/</span> 
                 Manage subsystems and applications
-              </p>
+              </p> */}
             </div>
 
             <button
@@ -235,9 +235,17 @@ export default function DeviceHub() {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function FeatureCard({
+interface FeatureCardProps {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  accent: string;
+  onClick: () => void;
+  status?: "active" | "beta" | "inactive";
+}
+
+export function FeatureCard({
   title,
   description,
   icon: Icon,
@@ -248,54 +256,123 @@ function FeatureCard({
   const isInactive = status === "inactive";
 
   return (
-    <div
+    <motion.div
       onClick={!isInactive ? onClick : undefined}
-      className={`group relative bg-[#0c0c16] rounded-2xl p-6 border transition-all duration-300 overflow-hidden flex flex-col min-h-[180px] ${
+      whileHover={!isInactive ? { y: -2 } : undefined}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className={`group relative rounded-2xl border transition-colors duration-300 overflow-hidden flex flex-col min-h-[180px] ${
         isInactive
-          ? "border-[#151520] opacity-50 cursor-not-allowed"
-          : "border-[#1a1a28] hover:border-[var(--card-accent)] hover:bg-[#0e0e1a] cursor-pointer shadow-none hover:shadow-[0_0_30px_var(--glow-accent)]"
+          ? "bg-[#0a0a12] border-[#111118] opacity-40 cursor-not-allowed"
+          : "bg-[#0a0a12] border-[#131320] hover:border-[#1e1e30] cursor-pointer"
       }`}
-      style={
-        {
-          "--card-accent": `${accent}66`, // 40% opacity border
-          "--glow-accent": `${accent}15`, // subtle glow
-        } as React.CSSProperties
-      }
     >
-      {/* Status Badges */}
-      {status === "beta" && (
-        <div className="absolute top-6 right-6 px-2 py-0.5 border border-[#a78bde]/30 bg-[#a78bde]/10 text-[#a78bde] text-[9px] font-bold rounded-md uppercase tracking-widest">
-          Beta
-        </div>
-      )}
-      {status === "inactive" && (
-        <div className="absolute top-6 right-6 px-2 py-0.5 border border-[#333] bg-[#111] text-[#555] text-[9px] font-bold rounded-md uppercase tracking-widest">
-          Unassigned
-        </div>
-      )}
-
-      {/* Icon */}
-      <div className="mb-5 inline-flex p-2.5 rounded-xl border border-[#1a1a28] bg-[#0a0a14] group-hover:scale-110 transition-transform duration-500">
-        <Icon size={20} style={{ color: isInactive ? "#444" : accent }} />
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 space-y-1.5">
-        <h3 className="text-sm font-bold text-[#dde1f0] uppercase tracking-widest">
-          {title}
-        </h3>
-        <p className="text-[11px] text-[#555] leading-relaxed">
-          {description}
-        </p>
-      </div>
-
-      {/* Hover Action */}
+      {/* Light sweep on hover — replaces the expanding glow box */}
       {!isInactive && (
-        <div className="mt-6 flex items-center text-[10px] font-bold uppercase tracking-widest opacity-0 transform translate-y-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0" style={{ color: accent }}>
-          Initialize Subsystem <ChevronRight size={12} className="ml-1" />
-        </div>
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse 80% 60% at 20% 0%, ${accent}09 0%, transparent 70%)`,
+          }}
+        />
       )}
-    </div>
+
+      {/* Accent line along top edge */}
+      <div
+        className="absolute top-0 left-6 right-6 h-px transition-all duration-500"
+        style={{
+          background: isInactive
+            ? "transparent"
+            : `linear-gradient(90deg, transparent, ${accent}30, transparent)`,
+          opacity: 0,
+        }}
+        ref={(el) => {
+          // CSS-only approach via group-hover instead of JS ref
+        }}
+      />
+      {/* Use CSS group-hover for the line */}
+      <style>{`
+        .group:hover .accent-line { opacity: 1 !important; }
+      `}</style>
+      <div
+        className="accent-line absolute top-0 left-6 right-6 h-px transition-all duration-500"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${accent}50, transparent)`,
+          opacity: 0,
+        }}
+      />
+
+      {/* Card content */}
+      <div className="relative z-10 p-6 flex flex-col flex-1">
+
+        {/* Top row: icon (free-floating) + badge */}
+        <div className="flex items-start justify-between mb-6">
+          {/* Icon — no box, just the icon itself with a drop shadow */}
+          <div
+            className={`transition-all duration-400 ${
+              !isInactive ? "group-hover:translate-x-0.5 group-hover:-translate-y-0.5" : ""
+            }`}
+            style={{
+              filter: isInactive
+                ? "none"
+                : `drop-shadow(0 0 8px ${accent}55)`,
+            }}
+          >
+            <Icon
+              size={22}
+              style={{ color: isInactive ? "#2a2a3a" : accent }}
+            />
+          </div>
+
+          {/* Badges */}
+          {status === "beta" && (
+            <span
+              className="text-[8px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 rounded"
+              style={{
+                color: accent,
+                background: `${accent}12`,
+                border: `1px solid ${accent}25`,
+              }}
+            >
+              Beta
+            </span>
+          )}
+          {status === "inactive" && (
+            <span className="text-[8px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 rounded text-[#333] bg-[#111] border border-[#1a1a28]">
+              Unassigned
+            </span>
+          )}
+        </div>
+
+        {/* Text */}
+        <div className="flex-1">
+          <h3 className="text-[11px] font-bold text-[#c8cfe8] uppercase tracking-[0.15em] mb-2">
+            {title}
+          </h3>
+          <p className="text-[10px] text-[#33334a] leading-relaxed font-mono">
+            {description}
+          </p>
+        </div>
+
+        {/* Bottom action — slides up on hover */}
+        {!isInactive && (
+          <div className="mt-5 flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.15em] opacity-0 translate-y-1.5 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0"
+               style={{ color: accent }}>
+            Initialize
+            <ChevronRight size={10} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+          </div>
+        )}
+      </div>
+
+      {/* Bottom edge accent — thin rule that appears on hover */}
+      {!isInactive && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+          style={{
+            background: `linear-gradient(90deg, transparent 10%, ${accent}20 50%, transparent 90%)`,
+          }}
+        />
+      )}
+    </motion.div>
   );
 }
 
@@ -319,14 +396,12 @@ function SettingsModal({
         onClick={onClose}
       />
 
-      {/* Modal Content */}
       <motion.div
         initial={{ scale: 0.95, opacity: 0, y: 10 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 10 }}
         className="relative bg-[#0c0c16] border border-[#151522] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
       >
-        {/* Header */}
         <div className="bg-[#0a0a14] border-b border-[#1a1a28] px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Settings size={16} className="text-[#7b8cde]" />

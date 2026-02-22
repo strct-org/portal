@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, WifiOff, Router, Radio, Eye, EyeOff,
@@ -8,221 +8,30 @@ import {
   Activity, Users, Globe,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  useDeviceWifi,
+  CHANNELS, DNS_OPTIONS, signalBars,
+  type Mode, RouterConfig,WiFiStatus,
+} from "@/api/device/wifi";
 
-
-type Mode = "off" | "router" | "extender";
-
-type RouterConfig = {
-  ssid: string;
-  password: string;
-  band: "2.4GHz" | "5GHz";
-  channel: number;
-  max_clients: number;
-  subnet_base: string;
-  dns_provider: "cloudflare" | "google" | "adguard" | "quad9";
-};
-
-type ExtenderConfig = {
-  upstream_ssid: string;
-  upstream_password: string;
-  extender_ssid: string;
-  extender_password: string;
-  extender_band: "2.4GHz" | "5GHz";
-  use_second_radio: boolean;
-};
-
-type WiFiConfig = {
-  mode: Mode;
-  router: RouterConfig;
-  extender: ExtenderConfig;
-};
-
-type WiFiStatus = {
-  mode: Mode;
-  active: boolean;
-  ssid?: string;
-  ap_interface?: string;
-  subnet_base?: string;
-  gateway_ip?: string;
-  connected_ips: number;
-  upstream_ssid?: string;
-  error?: string;
-};
-
-type ScannedNetwork = {
-  ssid: string;
-  signal_dbm: number;
-  frequency: string;
-  encrypted: boolean;
-  mac: string;
-};
-
-
-const DEFAULT_CONFIG: WiFiConfig = {
-  mode: "off",
-  router: {
-    ssid: "StrctNet",
-    password: "",
-    band: "5GHz",
-    channel: 36,
-    max_clients: 20,
-    subnet_base: "192.168.100",
-    dns_provider: "cloudflare",
-  },
-  extender: {
-    upstream_ssid: "",
-    upstream_password: "",
-    extender_ssid: "StrctNet-Ext",
-    extender_password: "",
-    extender_band: "5GHz",
-    use_second_radio: false,
-  },
-};
-
-const CHANNELS: Record<string, number[]> = {
-  "2.4GHz": [1, 6, 11],
-  "5GHz": [36, 40, 44, 48, 149, 153, 157, 161],
-};
-
-const DNS_OPTIONS = [
-  { key: "cloudflare", label: "Cloudflare", ip: "1.1.1.1",        desc: "Fastest · privacy-first" },
-  { key: "google",     label: "Google",     ip: "8.8.8.8",         desc: "Reliable · widely used" },
-  { key: "adguard",    label: "AdGuard",    ip: "94.140.14.14",    desc: "Blocks ads at DNS level" },
-  { key: "quad9",      label: "Quad9",      ip: "9.9.9.9",         desc: "Blocks malware domains" },
-];
-
-
-function apiBase(deviceId: string) {
-  // In production the Next.js proxy rewrites /device/[id]/api/* → http://device/api/*
-  // In dev everything hits the local agent directly via the frp tunnel
-  return `/device/${deviceId}`;
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WiFiPage() {
-  const params   = useParams();
+  const params     = useParams();
   const pageRouter = useRouter();
-  const deviceId = params.device_id as string;
-  const base     = apiBase(deviceId);
+  const deviceId   = params.device_id as string;
 
-  const [config,       setConfig]       = useState<WiFiConfig>(DEFAULT_CONFIG);
-  const [status,       setStatus]       = useState<WiFiStatus>({ mode: "off", active: false, connected_ips: 0 });
-  const [selectedMode, setSelectedMode] = useState<Mode>("off");
-  const [applying,     setApplying]     = useState(false);
-  const [stopping,     setStopping]     = useState(false);
-  const [loading,      setLoading]      = useState(true);
-  const [scanning,     setScanning]     = useState(false);
-  const [networks,     setNetworks]     = useState<ScannedNetwork[]>([]);
-  const [showNets,     setShowNets]     = useState(false);
-  const [showPwd,      setShowPwd]      = useState(false);
-  const [showUpPwd,    setShowUpPwd]    = useState(false);
-  const [lastError,    setLastError]    = useState<string | null>(null);
+  const {
+    config, status, selectedMode, networks,
+    loading, applying, stopping, scanning, error,
+    setSelectedMode, setError,
+    updateRouter, updateExtender,
+    fetchAll, apply, stop, scan,
+  } = useDeviceWifi(deviceId);
 
-  // ── Load config + status on mount ──────────────────────────────────────────
-  const fetchAll = useCallback(async () => {
-    try {
-      const [cfgRes, stRes] = await Promise.all([
-        fetch(`${base}/api/wifi/config`),
-        fetch(`${base}/api/wifi/status`),
-      ]);
-      if (cfgRes.ok) {
-        const cfg: WiFiConfig = await cfgRes.json();
-        setConfig(cfg);
-        setSelectedMode(cfg.mode);
-      }
-      if (stRes.ok) {
-        const st: WiFiStatus = await stRes.json();
-        setStatus(st);
-        if (st.error) setLastError(st.error);
-      }
-    } catch (e) {
-      setLastError("Could not reach device");
-    } finally {
-      setLoading(false);
-    }
-  }, [base]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  // Poll status every 10s when active
-  useEffect(() => {
-    if (!status.active) return;
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch(`${base}/api/wifi/status`);
-        if (res.ok) setStatus(await res.json());
-      } catch {}
-    }, 10_000);
-    return () => clearInterval(id);
-  }, [status.active, base]);
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const updateRouter   = (k: keyof RouterConfig,   v: any) => setConfig(c => ({ ...c, router:   { ...c.router,   [k]: v } }));
-  const updateExtender = (k: keyof ExtenderConfig, v: any) => setConfig(c => ({ ...c, extender: { ...c.extender, [k]: v } }));
-
-  // ── Apply ──────────────────────────────────────────────────────────────────
-  const handleApply = async () => {
-    setApplying(true);
-    setLastError(null);
-    const payload: WiFiConfig = { ...config, mode: selectedMode };
-    try {
-      const res = await fetch(`${base}/api/wifi/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        setLastError(body || `HTTP ${res.status}`);
-        return;
-      }
-      setConfig(payload);
-      // Poll until active (backend applies async)
-      let tries = 0;
-      const poll = setInterval(async () => {
-        tries++;
-        const st = await fetch(`${base}/api/wifi/status`).then(r => r.json()).catch(() => null);
-        if (st?.active || tries > 10) {
-          clearInterval(poll);
-          if (st) setStatus(st);
-          setApplying(false);
-        }
-      }, 1500);
-    } catch (e: any) {
-      setLastError(e.message);
-      setApplying(false);
-    }
-  };
-
-  // ── Stop ───────────────────────────────────────────────────────────────────
-  const handleStop = async () => {
-    setStopping(true);
-    try {
-      await fetch(`${base}/api/wifi/stop`, { method: "POST" });
-      setSelectedMode("off");
-      setStatus(s => ({ ...s, active: false, mode: "off" }));
-    } finally {
-      setStopping(false);
-    }
-  };
-
-  // ── Scan ───────────────────────────────────────────────────────────────────
-  const scanNetworks = async () => {
-    setScanning(true);
-    setShowNets(true);
-    try {
-      const res  = await fetch(`${base}/api/wifi/scan`);
-      const data: ScannedNetwork[] = await res.json();
-      setNetworks(data.sort((a, b) => b.signal_dbm - a.signal_dbm));
-    } catch {
-      setNetworks([]);
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const signalBars = (dbm: number) => dbm > -50 ? 4 : dbm > -65 ? 3 : dbm > -75 ? 2 : 1;
+  // ── Local UI state (panel toggles — not network state) ──────────────────
+  const [showNets,  setShowNets]  = useState(false);
+  const [showPwd,   setShowPwd]   = useState(false);
+  const [showUpPwd, setShowUpPwd] = useState(false);
 
   if (loading) return <LoadingScreen />;
 
@@ -257,12 +66,12 @@ export default function WiFiPage() {
 
         {/* ── Error banner ───────────────────────────────────────────────── */}
         <AnimatePresence>
-          {lastError && (
+          {error && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                         className="flex items-start gap-3 p-3 bg-[#1a0808] border border-[#3a1010] rounded-xl text-xs text-red-400">
               <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
-              <span>{lastError}</span>
-              <button onClick={() => setLastError(null)} className="ml-auto text-[#444] hover:text-[#888]">✕</button>
+              <span>{error}</span>
+              <button onClick={() => setError(null)} className="ml-auto text-[#444] hover:text-[#888]">✕</button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -272,9 +81,9 @@ export default function WiFiPage() {
           <SectionLabel>mode</SectionLabel>
           <div className="grid grid-cols-3 gap-2 mt-3">
             {([
-              { mode: "off",      icon: <WifiOff size={16} />,  label: "Off",      sub: "disabled",               color: "gray"   },
-              { mode: "router",   icon: <Router  size={16} />,  label: "Router",   sub: "eth0 → wlan0 AP + NAT",  color: "blue"   },
-              { mode: "extender", icon: <Radio   size={16} />,  label: "Extender", sub: "wlan0 client → wlan0_ap", color: "purple" },
+              { mode: "off",      icon: <WifiOff size={16} />, label: "Off",      sub: "disabled",                color: "gray"   },
+              { mode: "router",   icon: <Router  size={16} />, label: "Router",   sub: "eth0 → wlan0 AP + NAT",   color: "blue"   },
+              { mode: "extender", icon: <Radio   size={16} />, label: "Extender", sub: "wlan0 client → wlan0_ap", color: "purple" },
             ] as const).map(({ mode, icon, label, sub, color }) => (
               <ModeCard key={mode} mode={mode} selected={selectedMode === mode}
                         active={status.active && status.mode === mode}
@@ -289,7 +98,6 @@ export default function WiFiPage() {
           {selectedMode === "router" && (
             <motion.div key="router" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="space-y-4">
 
-              {/* AP Settings */}
               <Panel title="access point" hint="hostapd.conf">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="SSID" hint="ssid=">
@@ -334,11 +142,10 @@ export default function WiFiPage() {
                 </div>
               </Panel>
 
-              {/* DNS */}
               <Panel title="dns provider" hint="dnsmasq: server=">
                 <div className="grid grid-cols-2 gap-2">
                   {DNS_OPTIONS.map(opt => (
-                    <button key={opt.key} onClick={() => updateRouter("dns_provider", opt.key as any)}
+                    <button key={opt.key} onClick={() => updateRouter("dns_provider", opt.key as RouterConfig["dns_provider"])}
                             className={`text-left p-3 rounded-lg border transition-all ${
                               config.router.dns_provider === opt.key
                                 ? "bg-[#0b0d1a] border-[#6b7fd4]/40"
@@ -355,7 +162,6 @@ export default function WiFiPage() {
                 </div>
               </Panel>
 
-              {/* Note: Ad-blocking and VPN are configured in their own pages */}
               <div className="flex items-start gap-2 p-3 bg-[#0a0a14] border border-[#141420] rounded-xl text-[10px] text-[#333]">
                 <Globe size={11} className="mt-0.5 flex-shrink-0 text-[#2a2a3a]" />
                 <span>Ad-blocking and VPN (Tailscale) are configured separately in their own panels. They read the active WiFi subnet automatically.</span>
@@ -366,7 +172,6 @@ export default function WiFiPage() {
           {selectedMode === "extender" && (
             <motion.div key="extender" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="space-y-4">
 
-              {/* Bandwidth warning */}
               <div className="flex items-start gap-2.5 p-3 bg-[#130f00] border border-[#302000] rounded-xl">
                 <AlertTriangle size={12} className="text-amber-500 mt-0.5 flex-shrink-0" />
                 <p className="text-[10px] text-[#665533] leading-relaxed">
@@ -376,7 +181,6 @@ export default function WiFiPage() {
                 </p>
               </div>
 
-              {/* Upstream */}
               <Panel title="upstream network" hint="wpa_supplicant -i wlan0">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Network to Extend" hint="ssid=">
@@ -384,7 +188,7 @@ export default function WiFiPage() {
                       <MonoInput value={config.extender.upstream_ssid}
                                  onChange={v => updateExtender("upstream_ssid", v)}
                                  placeholder="Existing WiFi SSID" />
-                      <button onClick={scanNetworks}
+                      <button onClick={() => { scan(); setShowNets(true); }}
                               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#2a2a3a] hover:text-[#6b7fd4] transition-colors">
                         <Search size={13} />
                       </button>
@@ -397,7 +201,6 @@ export default function WiFiPage() {
                   </Field>
                 </div>
 
-                {/* Network list */}
                 <AnimatePresence>
                   {showNets && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
@@ -418,7 +221,8 @@ export default function WiFiPage() {
                           ) : networks.length === 0 ? (
                             <div className="text-center py-6 text-[#252535] text-xs">no networks found</div>
                           ) : networks.map(net => (
-                            <button key={net.mac} onClick={() => { updateExtender("upstream_ssid", net.ssid); setShowNets(false); }}
+                            <button key={net.mac}
+                                    onClick={() => { updateExtender("upstream_ssid", net.ssid); setShowNets(false); }}
                                     className="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-[#0e0e1c] transition-colors text-left group">
                               <div className="flex items-center gap-2.5">
                                 <SignalBars bars={signalBars(net.signal_dbm)} />
@@ -444,7 +248,6 @@ export default function WiFiPage() {
                 </AnimatePresence>
               </Panel>
 
-              {/* Extended AP */}
               <Panel title="extended ap" hint="hostapd on wlan0_ap">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="New SSID" hint="ssid=  (on wlan0_ap)">
@@ -458,7 +261,6 @@ export default function WiFiPage() {
                                type="password" placeholder="min 8 chars" />
                   </Field>
                 </div>
-
                 <div className="mt-3">
                   <ToggleRow
                     enabled={config.extender.use_second_radio}
@@ -476,7 +278,7 @@ export default function WiFiPage() {
         {/* ── Action bar ─────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 pt-1">
           {selectedMode !== "off" && (
-            <button onClick={handleApply} disabled={applying}
+            <button onClick={apply} disabled={applying}
                     className="flex-1 flex items-center justify-center gap-2 bg-[#6b7fd4] hover:bg-[#7b8fe0] text-[#07070f] font-bold py-3 px-6 rounded-xl transition-colors text-xs disabled:opacity-40">
               {applying
                 ? <><RefreshCw size={12} className="animate-spin" /> applying...</>
@@ -485,7 +287,7 @@ export default function WiFiPage() {
             </button>
           )}
           {status.active && (
-            <button onClick={handleStop} disabled={stopping}
+            <button onClick={stop} disabled={stopping}
                     className="flex items-center gap-2 bg-[#0e0e18] hover:bg-[#141420] text-[#555] border border-[#1a1a28] font-bold py-3 px-5 rounded-xl transition-colors text-xs">
               {stopping ? <RefreshCw size={12} className="animate-spin" /> : <WifiOff size={12} />}
               stop
@@ -493,7 +295,7 @@ export default function WiFiPage() {
           )}
         </div>
 
-        {/* ── Live status ────────────────────────────────────────────────────── */}
+        {/* ── Live status card ────────────────────────────────────────────────── */}
         <AnimatePresence>
           {status.active && (
             <motion.div key="status-card"
@@ -509,10 +311,10 @@ export default function WiFiPage() {
                 </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-[#0f1a0f]">
-                <StatCell icon={<Wifi size={11} />}       label="ssid"    value={status.ssid     || "—"} />
-                <StatCell icon={<Users size={11} />}      label="devices" value={String(status.connected_ips)} sub="connected" />
-                <StatCell icon={<Activity size={11} />}   label="gateway" value={status.gateway_ip || "—"} />
-                <StatCell icon={<Globe size={11} />}      label="subnet"  value={status.subnet_base ? `${status.subnet_base}.0/24` : "—"} />
+                <StatCell icon={<Wifi size={11} />}     label="ssid"    value={status.ssid     || "—"} />
+                <StatCell icon={<Users size={11} />}    label="devices" value={String(status.connected_ips)} sub="connected" />
+                <StatCell icon={<Activity size={11} />} label="gateway" value={status.gateway_ip || "—"} />
+                <StatCell icon={<Globe size={11} />}    label="subnet"  value={status.subnet_base ? `${status.subnet_base}.0/24` : "—"} />
               </div>
               {status.upstream_ssid && (
                 <div className="px-5 py-2 border-t border-[#0f1a0f] text-[10px] text-[#1e4a1e] font-mono">
@@ -565,9 +367,7 @@ function StatusPill({ status, onRefresh }: { status: WiFiStatus; onRefresh: () =
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[9px] text-[#252535] uppercase tracking-[0.2em] font-bold">{children}</p>
-  );
+  return <p className="text-[9px] text-[#252535] uppercase tracking-[0.2em] font-bold">{children}</p>;
 }
 
 function ModeCard({ mode, selected, active, icon, label, sub, color, onClick }: {
@@ -576,15 +376,15 @@ function ModeCard({ mode, selected, active, icon, label, sub, color, onClick }: 
   onClick: () => void;
 }) {
   const ring = {
-    gray:   selected ? "border-[#252535] bg-[#0e0e18]" : "border-[#111118] bg-[#090912] hover:border-[#1a1a28]",
-    blue:   selected ? "border-[#6b7fd4]/40 bg-[#090b18]" : "border-[#111118] bg-[#090912] hover:border-[#1a1a28]",
-    purple: selected ? "border-[#9b7fd4]/40 bg-[#0c0918]" : "border-[#111118] bg-[#090912] hover:border-[#1a1a28]",
+    gray:   selected ? "border-[#252535] bg-[#0e0e18]"       : "border-[#111118] bg-[#090912] hover:border-[#1a1a28]",
+    blue:   selected ? "border-[#6b7fd4]/40 bg-[#090b18]"    : "border-[#111118] bg-[#090912] hover:border-[#1a1a28]",
+    purple: selected ? "border-[#9b7fd4]/40 bg-[#0c0918]"    : "border-[#111118] bg-[#090912] hover:border-[#1a1a28]",
   }[color] ?? "";
 
   const iconColor = {
-    gray:   selected ? "text-[#555]"     : "text-[#252535]",
-    blue:   selected ? "text-[#6b7fd4]"  : "text-[#252535]",
-    purple: selected ? "text-[#9b7fd4]"  : "text-[#252535]",
+    gray:   selected ? "text-[#555]"    : "text-[#252535]",
+    blue:   selected ? "text-[#6b7fd4]" : "text-[#252535]",
+    purple: selected ? "text-[#9b7fd4]" : "text-[#252535]",
   }[color] ?? "text-[#252535]";
 
   return (
@@ -711,7 +511,7 @@ function Switch({ active }: { active: boolean }) {
 function SignalBars({ bars }: { bars: number }) {
   return (
     <div className="flex items-end gap-0.5 h-3.5 flex-shrink-0">
-      {[1,2,3,4].map((b,i) => (
+      {[1,2,3,4].map((b, i) => (
         <div key={b} className="w-0.5 rounded-sm transition-colors"
              style={{ height: `${25*b}%`, backgroundColor: i < bars ? "#6b7fd4" : "#1e1e2e" }} />
       ))}
@@ -722,7 +522,8 @@ function SignalBars({ bars }: { bars: number }) {
 function StatCell({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
     <div className="px-4 py-3 space-y-1">
-      <div className="flex items-center gap-1.5 text-[#1e3a1e]">{icon}
+      <div className="flex items-center gap-1.5 text-[#1e3a1e]">
+        {icon}
         <span className="text-[8px] uppercase tracking-widest">{label}</span>
       </div>
       <div className="text-xs font-bold font-mono text-[#c8cfe8]">{value}</div>
